@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPC-Dehaze - AI Image Dehazing Tool</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .main-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .card-header h2 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .card-header p {
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .card-body {
+            padding: 40px;
+        }
+
+        .upload-area {
+            border: 3px dashed #e5e7eb;
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: #f9fafb;
+        }
+
+        .upload-area:hover {
+            border-color: #4f46e5;
+            background: #f0f9ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #4f46e5;
+            background: #eff6ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: #9ca3af;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            color: #9ca3af;
+            font-size: 0.9rem;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .uploaded-files {
+            margin-top: 30px;
+        }
+
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .file-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .file-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border-color: #4f46e5;
+        }
+
+        .file-card.selected {
+            border: 2px solid #4f46e5;
+            background: #f0f9ff;
+        }
+
+        .file-preview {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            background: #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-size: 2rem;
+            overflow: hidden;
+        }
+
+        .file-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .file-info {
+            text-align: left;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+
+        .file-details {
+            color: #6b7280;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        .processing-options {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .option-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .option-label {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .option-input {
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .option-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .option-checkbox {
+            margin-right: 10px;
+            transform: scale(1.2);
+            accent-color: #4f46e5;
+        }
+
+        .checkbox-label {
+            font-weight: 600;
+            color: #374151;
+            cursor: pointer;
+        }
+
+        .option-hint {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+
+        .action-buttons {
+            margin-top: 40px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+            border: 2px solid #e5e7eb;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+            border-color: #d1d5db;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results-section {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+        }
+
+        .result-card {
+            background: #f0f9ff;
+            border: 2px solid #0ea5e9;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .result-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(14, 165, 233, 0.2);
+        }
+
+        .result-preview {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            background: #e0f2fe;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0284c7;
+            font-size: 2.5rem;
+            overflow: hidden;
+        }
+
+        .result-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .result-info {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        .result-name {
+            font-weight: 600;
+            color: #0c4a6e;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+
+        .result-details {
+            color: #0369a1;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(14, 165, 233, 0.3);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4f46e5, #7c3aed);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* Welcome Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .welcome-modal {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.5s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .welcome-icon {
+            font-size: 4rem;
+            color: #4f46e5;
+            margin-bottom: 20px;
+        }
+
+        .welcome-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 15px;
+        }
+
+        .welcome-message {
+            font-size: 1.1rem;
+            color: #6b7280;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .welcome-features {
+            text-align: left;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 12px;
+        }
+
+        .welcome-features h4 {
+            color: #374151;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            color: #6b7280;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .feature-list li i {
+            color: #10b981;
+            font-size: 0.9rem;
+        }
+
+        .modal-btn {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .modal-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .card-body {
+                padding: 25px;
+            }
+
+            .options-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .welcome-modal {
+                padding: 30px 20px;
+                margin: 20px;
+            }
+
+            .welcome-title {
+                font-size: 1.5rem;
+            }
+        }
+
+        .stats-bar {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            text-align: center;
+        }
+
+        .stat-item {
+            padding: 15px;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #4f46e5;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #6b7280;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        /* Image Selection Styles */
+        .image-selection {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .selection-container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .image-preview-container {
+            text-align: center;
+        }
+
+        #selectionCanvas {
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            cursor: crosshair;
+            max-width: 100%;
+            height: auto;
+            background: #f9fafb;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .selection-controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .selection-instructions {
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .selection-instructions h4 {
+            color: #374151;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .selection-instructions ol {
+            color: #6b7280;
+            line-height: 1.8;
+            margin-bottom: 20px;
+        }
+
+        .selection-instructions li {
+            margin-bottom: 8px;
+        }
+
+        .selection-status {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            text-align: center;
+        }
+
+        .status-text {
+            display: block;
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .selection-count {
+            display: block;
+            color: #4f46e5;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        /* Dual Results Styles */
+        .dual-results {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .result-section {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+        }
+
+        .result-section h4 {
+            color: #374151;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+
+        .result-image {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #d1d5db;
+        }
+
+        .result-download {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+
+        .result-download:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- Welcome Modal -->
+    <div class="modal-overlay" id="welcomeModal">
+        <div class="welcome-modal">
+            <div class="welcome-icon">
+                <i class="fas fa-cloud-sun"></i>
+            </div>
+            <div class="welcome-title">Welcome to IPC-Dehaze!</div>
+            <div class="welcome-message">
+                Your AI-powered solution for removing fog, haze, and atmospheric distortion from images.
+            </div>
+            <div class="welcome-features">
+                <h4><i class="fas fa-star"></i> Key Features:</h4>
+                <ul class="feature-list">
+                    <li><i class="fas fa-check-circle"></i> Advanced AI dehazing technology</li>
+                    <li><i class="fas fa-check-circle"></i> Batch processing for multiple images</li>
+                    <li><i class="fas fa-check-circle"></i> Customizable processing parameters</li>
+                    <li><i class="fas fa-check-circle"></i> High-quality output results</li>
+                    <li><i class="fas fa-check-circle"></i> Easy drag & drop interface</li>
+                </ul>
+            </div>
+            <button class="modal-btn" onclick="closeWelcomeModal()">
+                <i class="fas fa-rocket"></i> Get Started
+            </button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-cloud-sun"></i> IPC-Dehaze</h1>
+            <p>AI-Powered Image Dehazing Tool - Remove Fog, Haze & Atmospheric Distortion</p>
+        </div>
+
+        <div class="main-card">
+            <div class="card-header">
+                <h2><i class="fas fa-upload"></i> Upload Images</h2>
+                <p>Select multiple foggy images to process (Max: 10 images, 100MB total)</p>
+            </div>
+            <div class="card-body">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <div class="upload-text">Drag & Drop images here or click to browse</div>
+                    <div class="upload-hint">Supports: PNG, JPG, JPEG, BMP, TIFF</div>
+                    <input type="file" class="file-input" id="fileInput" multiple accept="image/*">
+                </div>
+
+                <div class="uploaded-files" id="uploadedFiles" style="display: none;">
+                    <h3><i class="fas fa-images"></i> Uploaded Images</h3>
+                    <p style="color: #6b7280; margin-bottom: 15px; font-size: 0.9rem;">
+                        <i class="fas fa-info-circle"></i> Click on any image to load it in the selection tool below
+                    </p>
+                    <div class="file-grid" id="fileGrid"></div>
+                </div>
+
+                <div class="image-selection" id="imageSelection" style="display: none;">
+                    <h3><i class="fas fa-crop"></i> Select License Plate Regions</h3>
+                    <p style="color: #6b7280; margin-bottom: 15px; font-size: 0.9rem;">
+                        <i class="fas fa-mouse-pointer"></i> Click and drag on the image below to select license plate areas
+                    </p>
+                    <div class="selection-container">
+                        <div class="image-preview-container">
+                            <canvas id="selectionCanvas" width="800" height="600"></canvas>
+                            <div class="selection-controls">
+                                <button class="btn btn-secondary" id="clearSelectionBtn">
+                                    <i class="fas fa-eraser"></i> Clear Selection
+                                </button>
+                                <button class="btn btn-primary" id="confirmSelectionBtn">
+                                    <i class="fas fa-check"></i> Confirm Selection
+                                </button>
+                            </div>
+                        </div>
+                        <div class="selection-instructions">
+                            <h4><i class="fas fa-info-circle"></i> How to Select:</h4>
+                            <ol>
+                                <li>Click and drag to draw selection boxes around license plates</li>
+                                <li>You can select multiple regions</li>
+                                <li>Each selection will be enhanced separately</li>
+                                <li>Click "Confirm Selection" when done</li>
+                            </ol>
+                            <div class="selection-status" id="selectionStatus">
+                                <span class="status-text">No regions selected</span>
+                                <span class="selection-count">0 regions</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="processing-options" id="processingOptions" style="display: none;">
+                    <h3><i class="fas fa-cogs"></i> Processing Options</h3>
+                    <div class="options-grid">
+                        <div class="option-group">
+                            <label class="option-label">Number of Iterations</label>
+                            <input type="number" class="option-input" id="numIterations" value="8" min="1" max="20">
+                            <div class="option-hint">Higher = better quality, slower processing</div>
+                        </div>
+                        <div class="option-group">
+                            <label class="option-label">Max Size (pixels)</label>
+                            <input type="number" class="option-input" id="maxSize" value="1500" min="512" max="3000">
+                            <div class="option-hint">Larger images will be scaled down</div>
+                        </div>
+                        <div class="option-group">
+                            <label class="option-label">Resize Long Edge To</label>
+                            <input type="number" class="option-input" id="resizeTo" value="0" min="0" max="3000">
+                            <div class="option-hint">0 = no resize, >0 = upscale small images</div>
+                        </div>
+                        <div class="option-group">
+                            <label class="option-label">Force Width (pixels)</label>
+                            <input type="number" class="option-input" id="forceWidth" value="0" min="0" max="3000">
+                            <div class="option-hint">0 = auto, >0 = force specific width</div>
+                        </div>
+                        <div class="option-group">
+                            <label class="option-label">Force Height (pixels)</label>
+                            <input type="number" class="option-input" id="forceHeight" value="0" min="0" max="3000">
+                            <div class="option-hint">0 = auto, >0 = force specific height</div>
+                        </div>
+                        <div class="option-group">
+                            <label class="option-label">
+                                <input type="checkbox" id="enhancePlates" class="option-checkbox">
+                                <span class="checkbox-label">Enhance License Plates</span>
+                            </label>
+                            <div class="option-hint">Automatically detect and enhance license plates for better readability</div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-primary" id="processBtn">
+                            <i class="fas fa-magic"></i> Process Images
+                        </button>
+                        <button class="btn btn-secondary" id="clearBtn">
+                            <i class="fas fa-trash"></i> Clear All
+                        </button>
+                    </div>
+                </div>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <h3>Processing Images...</h3>
+                    <p>This may take a few minutes depending on image size and settings</p>
+                    <div class="progress-bar" id="progressBar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+
+                <div class="alert" id="alert"></div>
+            </div>
+        </div>
+
+        <div class="main-card" id="resultsCard" style="display: none;">
+            <div class="card-header">
+                <h2><i class="fas fa-check-circle"></i> Processing Results</h2>
+                <p>Your dehazed images are ready for download</p>
+            </div>
+            <div class="card-body">
+                <div class="stats-bar" id="statsBar">
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-number" id="totalImages">0</div>
+                            <div class="stat-label">Total Images</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" id="processedImages">0</div>
+                            <div class="stat-label">Processed</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" id="totalSize">0</div>
+                            <div class="stat-label">Total Size (MB)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="results-section">
+                    <h3><i class="fas fa-images"></i> Dual Results</h3>
+                    <div class="dual-results" id="dualResults">
+                        <div class="result-section">
+                            <h4><i class="fas fa-globe"></i> Full Image Dehazed</h4>
+                            <div id="fullImageResult">
+                                <p>Full dehazed image will appear here</p>
+                            </div>
+                        </div>
+                        <div class="result-section">
+                            <h4><i class="fas fa-crop"></i> Selected Areas Enhanced</h4>
+                            <div id="selectedAreasResult">
+                                <p>Enhanced license plate regions will appear here</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="downloadAllBtn">
+                        <i class="fas fa-download"></i> Download All
+                    </button>
+                    <button class="btn btn-secondary" id="newSessionBtn">
+                        <i class="fas fa-plus"></i> New Session
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class IPCDehazeApp {
+            constructor() {
+                this.uploadedFiles = [];
+                this.actualUploadedFiles = []; // Store actual File objects
+                this.sessionId = null;
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.checkSession();
+            }
+
+            bindEvents() {
+                const uploadArea = document.getElementById('uploadArea');
+                const fileInput = document.getElementById('fileInput');
+
+                uploadArea.addEventListener('click', () => fileInput.click());
+                uploadArea.addEventListener('dragover', this.handleDragOver.bind(this));
+                uploadArea.addEventListener('dragleave', this.handleDragLeave.bind(this));
+                uploadArea.addEventListener('drop', this.handleDrop.bind(this));
+                fileInput.addEventListener('change', this.handleFileSelect.bind(this));
+
+                document.getElementById('processBtn').addEventListener('click', this.processImages.bind(this));
+                document.getElementById('clearBtn').addEventListener('click', this.clearAll.bind(this));
+                document.getElementById('downloadAllBtn').addEventListener('click', this.downloadAll.bind(this));
+                document.getElementById('newSessionBtn').addEventListener('click', this.newSession.bind(this));
+                
+                // New selection tool events
+                document.getElementById('clearSelectionBtn').addEventListener('click', this.clearSelection.bind(this));
+                document.getElementById('confirmSelectionBtn').addEventListener('click', this.confirmSelection.bind(this));
+            }
+
+            handleDragOver(e) {
+                e.preventDefault();
+                e.currentTarget.classList.add('dragover');
+            }
+
+            handleDragLeave(e) {
+                e.currentTarget.classList.remove('dragover');
+            }
+
+            handleDrop(e) {
+                e.preventDefault();
+                e.currentTarget.classList.remove('dragover');
+                const files = Array.from(e.dataTransfer.files);
+                this.processFiles(files);
+            }
+
+            handleFileSelect(e) {
+                const files = Array.from(e.target.files);
+                this.processFiles(files);
+            }
+
+            async processFiles(files) {
+                const imageFiles = files.filter(file => file.type.startsWith('image/'));
+                
+                if (imageFiles.length === 0) {
+                    this.showAlert('Please select valid image files', 'error');
+                    return;
+                }
+
+                if (imageFiles.length > 10) {
+                    this.showAlert('Maximum 10 images allowed', 'error');
+                    return;
+                }
+
+                const formData = new FormData();
+                imageFiles.forEach(file => formData.append('files', file));
+
+                try {
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        this.sessionId = result.session_id;
+                        this.uploadedFiles = result.files;
+                        // Store the actual File objects for canvas loading
+                        this.actualUploadedFiles = imageFiles;
+                        console.log('Stored actual files:', this.actualUploadedFiles);
+                        console.log('Stored file info:', this.uploadedFiles);
+                        this.displayFiles();
+                        this.showAlert(result.message, 'success');
+                    } else {
+                        this.showAlert(result.error, 'error');
+                    }
+                } catch (error) {
+                    this.showAlert('Upload failed: ' + error.message, 'error');
+                }
+            }
+
+            displayFiles() {
+                const fileGrid = document.getElementById('fileGrid');
+                const uploadedFiles = document.getElementById('uploadedFiles');
+                const imageSelection = document.getElementById('imageSelection');
+
+                fileGrid.innerHTML = '';
+                
+                this.uploadedFiles.forEach(file => {
+                    const fileCard = document.createElement('div');
+                    fileCard.className = 'file-card';
+                    
+                    // Create image preview using FileReader
+                    const preview = this.createImagePreview(file);
+                    
+                    fileCard.innerHTML = `
+                        ${preview}
+                        <div class="file-info">
+                            <div class="file-name">${file.filename}</div>
+                            <div class="file-details">
+                                ${file.width && file.height ? `${file.width} × ${file.height}px<br>` : ''}
+                                ${file.size_mb} MB
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add click event to load this image in the selection tool
+                    fileCard.style.cursor = 'pointer';
+                    fileCard.addEventListener('click', () => {
+                        // Clear previous selections when switching images
+                        this.selections = [];
+                        this.updateSelectionStatus();
+                        this.loadImageToCanvasFromFile(file);
+                        // Highlight selected file
+                        document.querySelectorAll('.file-card').forEach(card => card.style.border = '1px solid #e2e8f0');
+                        fileCard.style.border = '2px solid #4f46e5';
+                    });
+                    
+                    fileGrid.appendChild(fileCard);
+                });
+
+                uploadedFiles.style.display = 'block';
+                imageSelection.style.display = 'block';
+                
+                // Initialize selection tool and load first image
+                this.initSelectionTool();
+                if (this.uploadedFiles.length > 0) {
+                    // Load the actual image file from the upload
+                    this.loadImageToCanvasFromFile(this.uploadedFiles[0]);
+                    // Highlight first file as selected
+                    const firstCard = fileGrid.querySelector('.file-card');
+                    if (firstCard) {
+                        firstCard.style.border = '2px solid #4f46e5';
+                    }
+                }
+            }
+
+            createImagePreview(file) {
+                // For uploaded files, we'll show a placeholder since we don't have the actual file object
+                // In a real implementation, you'd store the File object and create a preview
+                return `<div class="file-preview">
+                    <i class="fas fa-image"></i>
+                    <div style="font-size: 0.8rem; margin-top: 5px;">${file.filename}</div>
+                </div>`;
+            }
+
+            async processImages() {
+                const processBtn = document.getElementById('processBtn');
+                const loading = document.getElementById('loading');
+                const progressBar = document.getElementById('progressBar');
+                const progressFill = document.getElementById('progressFill');
+
+                processBtn.disabled = true;
+                loading.style.display = 'block';
+                progressBar.style.display = 'block';
+
+                // Simulate progress
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += Math.random() * 15;
+                    if (progress > 90) progress = 90;
+                    progressFill.style.width = progress + '%';
+                }, 500);
+
+                                 const params = {
+                     num_iterations: parseInt(document.getElementById('numIterations').value),
+                     max_size: parseInt(document.getElementById('maxSize').value),
+                     resize_to: parseInt(document.getElementById('resizeTo').value),
+                     force_width: parseInt(document.getElementById('forceWidth').value),
+                     force_height: parseInt(document.getElementById('forceHeight').value),
+                     enhance_plates: document.getElementById('enhancePlates').checked,
+                     selections: this.selections || [],
+                     canvas_width: this.canvasDisplayWidth || 800,
+                     canvas_height: this.canvasDisplayHeight || 600,
+                     original_width: this.originalImageWidth || 0,
+                     original_height: this.originalImageHeight || 0
+                 };
+
+                try {
+                    const response = await fetch('/process', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(params)
+                    });
+
+                    const result = await response.json();
+
+                    clearInterval(progressInterval);
+                    progressFill.style.width = '100%';
+
+                    if (result.success) {
+                        setTimeout(() => {
+                            loading.style.display = 'none';
+                            this.displayResults(result.results);
+                            this.showAlert(result.message, 'success');
+                        }, 1000);
+                    } else {
+                        loading.style.display = 'none';
+                        this.showAlert(result.error, 'error');
+                    }
+                } catch (error) {
+                    clearInterval(progressInterval);
+                    loading.style.display = 'none';
+                    this.showAlert('Processing failed: ' + error.message, 'error');
+                } finally {
+                    processBtn.disabled = false;
+                }
+            }
+
+            displayResults(results) {
+                const resultsCard = document.getElementById('resultsCard');
+                const dualResults = document.getElementById('dualResults');
+                const statsBar = document.getElementById('statsBar');
+
+                // Display full image result
+                const fullImageResult = document.getElementById('fullImageResult');
+                if (results.length > 0) {
+                    const fullResult = results.find(r => r.filename.includes('full_dehazed'));
+                    if (fullResult) {
+                        fullImageResult.innerHTML = `
+                            <img src="/download/${this.sessionId}/${fullResult.filename}" class="result-image" alt="Full Dehazed">
+                            <a href="/download/${this.sessionId}/${fullResult.filename}" class="result-download">
+                                <i class="fas fa-download"></i> Download Full Image
+                            </a>
+                        `;
+                    }
+                }
+
+                // Display selected areas result
+                const selectedAreasResult = document.getElementById('selectedAreasResult');
+                const selectedResults = results.filter(r => r.filename.includes('selected_enhanced'));
+                if (selectedResults.length > 0) {
+                    let selectedHTML = '';
+                    selectedResults.forEach((result, index) => {
+                        selectedHTML += `
+                            <div style="margin-bottom: 15px;">
+                                <img src="/download/${this.sessionId}/${result.filename}" class="result-image" alt="Selected Area ${index + 1}">
+                                <div style="margin-top: 10px;">
+                                    <a href="/download/${this.sessionId}/${result.filename}" class="result-download">
+                                        <i class="fas fa-download"></i> Download Area ${index + 1}
+                                    </a>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    selectedAreasResult.innerHTML = selectedHTML;
+                }
+
+                // Update stats
+                document.getElementById('totalImages').textContent = results.length;
+                document.getElementById('processedImages').textContent = results.length;
+                let totalSize = results.reduce((sum, r) => sum + r.size_mb, 0);
+                document.getElementById('totalSize').textContent = totalSize.toFixed(1);
+
+                statsBar.style.display = 'block';
+                resultsCard.style.display = 'block';
+            }
+
+            createResultPreview(result) {
+                // Try to load the actual result image
+                return `<div class="result-preview">
+                    <i class="fas fa-check-circle"></i>
+                    <div style="font-size: 0.8rem; margin-top: 5px;">${result.filename}</div>
+                </div>`;
+            }
+
+            async downloadAll() {
+                // This would need to be implemented as a zip download on the backend
+                this.showAlert('Download all feature coming soon!', 'success');
+            }
+
+            async newSession() {
+                try {
+                    await fetch('/cleanup', { method: 'POST' });
+                    this.clearAll();
+                    this.showAlert('New session started', 'success');
+                } catch (error) {
+                    this.showAlert('Failed to start new session', 'error');
+                }
+            }
+
+            clearAll() {
+                this.uploadedFiles = [];
+                this.actualUploadedFiles = [];
+                this.sessionId = null;
+                
+                // Clear canvas
+                if (this.canvas && this.ctx) {
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                    this.currentImage = null;
+                    this.selections = [];
+                }
+                
+                document.getElementById('uploadedFiles').style.display = 'none';
+                document.getElementById('imageSelection').style.display = 'none';
+                document.getElementById('processingOptions').style.display = 'none';
+                document.getElementById('resultsCard').style.display = 'none';
+                document.getElementById('statsBar').style.display = 'none';
+                document.getElementById('fileInput').value = '';
+                
+                this.showAlert('All files cleared', 'success');
+            }
+
+            async checkSession() {
+                try {
+                    const response = await fetch('/status');
+                    const status = await response.json();
+                    
+                    if (status.has_files) {
+                        this.sessionId = status.session_id;
+                        // Could restore session state here
+                    }
+                } catch (error) {
+                    console.log('Session check failed:', error);
+                }
+            }
+
+            showAlert(message, type) {
+                const alert = document.getElementById('alert');
+                alert.textContent = message;
+                alert.className = `alert alert-${type}`;
+                alert.style.display = 'block';
+                
+                setTimeout(() => {
+                    alert.style.display = 'none';
+                }, 5000);
+            }
+
+            // Selection tool methods
+            initSelectionTool() {
+                this.canvas = document.getElementById('selectionCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.selections = [];
+                this.isDrawing = false;
+                this.startX = 0;
+                this.startY = 0;
+                this.currentImage = null;
+
+                this.canvas.addEventListener('mousedown', this.startDrawing.bind(this));
+                this.canvas.addEventListener('mousemove', this.draw.bind(this));
+                this.canvas.addEventListener('mouseup', this.endDrawing.bind(this));
+            }
+
+            startDrawing(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                this.startX = e.clientX - rect.left;
+                this.startY = e.clientY - rect.top;
+                this.isDrawing = true;
+            }
+
+            draw(e) {
+                if (!this.isDrawing) return;
+
+                const rect = this.canvas.getBoundingClientRect();
+                const currentX = e.clientX - rect.left;
+                const currentY = e.clientY - rect.top;
+
+                // Clear canvas and redraw image
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                if (this.currentImage) {
+                    this.ctx.drawImage(this.currentImage, 0, 0, this.canvas.width, this.canvas.height);
+                }
+
+                // Draw existing selections
+                this.drawSelections();
+
+                // Draw current selection
+                this.ctx.strokeStyle = '#ff0000';
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([5, 5]);
+                this.ctx.strokeRect(this.startX, this.startY, currentX - this.startX, currentY - this.startY);
+            }
+
+            endDrawing(e) {
+                if (!this.isDrawing) return;
+
+                const rect = this.canvas.getBoundingClientRect();
+                const endX = e.clientX - rect.left;
+                const endY = e.clientY - rect.top;
+
+                // Create selection box
+                const selection = {
+                    x: Math.min(this.startX, endX),
+                    y: Math.min(this.startY, endY),
+                    width: Math.abs(endX - this.startX),
+                    height: Math.abs(endY - this.startY)
+                };
+
+                // Only add if selection is large enough
+                if (selection.width > 20 && selection.height > 20) {
+                    this.selections.push(selection);
+                    this.updateSelectionStatus();
+                    this.drawSelections();
+                }
+
+                this.isDrawing = false;
+            }
+
+            drawSelections() {
+                this.selections.forEach((selection, index) => {
+                    this.ctx.strokeStyle = '#00ff00';
+                    this.ctx.lineWidth = 3;
+                    this.ctx.setLineDash([]);
+                    this.ctx.strokeRect(selection.x, selection.y, selection.width, selection.height);
+                    
+                    // Add selection number
+                    this.ctx.fillStyle = '#00ff00';
+                    this.ctx.font = '16px Arial';
+                    this.ctx.fillText(`${index + 1}`, selection.x + 5, selection.y + 20);
+                });
+            }
+
+            clearSelection() {
+                this.selections = [];
+                this.updateSelectionStatus();
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                if (this.currentImage) {
+                    this.ctx.drawImage(this.currentImage, 0, 0, this.canvas.width, this.canvas.height);
+                }
+            }
+
+            updateSelectionStatus() {
+                const statusText = document.querySelector('.status-text');
+                const selectionCount = document.querySelector('.selection-count');
+                
+                if (this.selections.length === 0) {
+                    statusText.textContent = 'No regions selected';
+                    selectionCount.textContent = '0 regions';
+                } else {
+                    statusText.textContent = 'Regions selected';
+                    selectionCount.textContent = `${this.selections.length} region${this.selections.length > 1 ? 's' : ''}`;
+                }
+            }
+
+            confirmSelection() {
+                if (this.selections.length === 0) {
+                    this.showAlert('Please select at least one region first', 'error');
+                    return;
+                }
+
+                // Hide selection tool and show processing options
+                document.getElementById('imageSelection').style.display = 'none';
+                document.getElementById('processingOptions').style.display = 'block';
+                
+                this.showAlert(`Confirmed ${this.selections.length} selection(s)`, 'success');
+            }
+
+                         loadImageToCanvas(imageFile) {
+                 return new Promise((resolve) => {
+                     const img = new Image();
+                     img.onload = () => {
+                         // Calculate canvas size to fit image with better aspect ratio handling
+                         const maxWidth = 800;
+                         const maxHeight = 600;
+                         let { width, height } = img;
+                         
+                         // Calculate aspect ratios
+                         const imageAspect = width / height;
+                         const canvasAspect = maxWidth / maxHeight;
+                         
+                         let canvasWidth, canvasHeight;
+                         
+                         if (imageAspect > canvasAspect) {
+                             // Image is wider than canvas
+                             canvasWidth = maxWidth;
+                             canvasHeight = maxWidth / imageAspect;
+                         } else {
+                             // Image is taller than canvas
+                             canvasHeight = maxHeight;
+                             canvasWidth = maxHeight * imageAspect;
+                         }
+                         
+                         // Store original image dimensions for coordinate scaling
+                         this.originalImageWidth = width;
+                         this.originalImageHeight = height;
+                         this.canvasDisplayWidth = canvasWidth;
+                         this.canvasDisplayHeight = canvasHeight;
+                         
+                         this.canvas.width = canvasWidth;
+                         this.canvas.height = canvasHeight;
+                         
+                         // Draw image
+                         this.ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+                         this.currentImage = img;
+                         
+                         // Show success message briefly
+                         this.ctx.fillStyle = '#10b981';
+                         this.ctx.font = '14px Arial';
+                         this.ctx.textAlign = 'center';
+                         this.ctx.fillText('Image loaded! Draw selection boxes around license plates', canvasWidth / 2, canvasHeight - 20);
+                         
+                         // Clear the message after 3 seconds
+                         setTimeout(() => {
+                             if (this.currentImage === img) {
+                                 this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+                                 this.ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+                             }
+                         }, 3000);
+                         
+                         resolve();
+                     };
+                     img.src = URL.createObjectURL(imageFile);
+                 });
+             }
+
+            loadImageToCanvasFromFile(fileInfo) {
+                console.log('Loading image:', fileInfo);
+                console.log('Available files:', this.actualUploadedFiles);
+                
+                // Show loading state
+                const canvas = document.getElementById('selectionCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Clear canvas and show loading message
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#6b7280';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Loading image...', canvas.width / 2, canvas.height / 2);
+                
+                // Get the actual file from the stored files
+                const actualFile = this.actualUploadedFiles.find(f => f.name === fileInfo.filename);
+                if (actualFile) {
+                    console.log('Found actual file:', actualFile);
+                    this.loadImageToCanvas(actualFile);
+                } else {
+                    // Fallback: try to load from the file info
+                    console.log('Loading image from file info:', fileInfo);
+                    console.log('File not found in actualUploadedFiles');
+                    // We need to store the actual File objects when uploading
+                    this.showAlert('Image loading issue - please try uploading again', 'error');
+                }
+            }
+        }
+
+        // Welcome modal functions
+        function closeWelcomeModal() {
+            document.getElementById('welcomeModal').style.display = 'none';
+            // Store in localStorage so it doesn't show again in this session
+            localStorage.setItem('welcomeShown', 'true');
+        }
+
+        // Initialize app when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            // Show welcome modal only if it hasn't been shown before
+            if (!localStorage.getItem('welcomeShown')) {
+                document.getElementById('welcomeModal').style.display = 'flex';
+            } else {
+                document.getElementById('welcomeModal').style.display = 'none';
+            }
+            
+            new IPCDehazeApp();
+        });
+    </script>
+</body>
+</html>
