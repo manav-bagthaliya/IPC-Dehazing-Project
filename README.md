@@ -13,4 +13,4 @@ Satellite Imagery: Removing atmospheric haze from satellite images, enabling mor
 Photography and Videography: Enhancing the visual quality of photos and videos taken in hazy conditions, producing clearer and more vibrant images.
 Medical Imaging: (Potentially) Adapting the technique to improve the clarity of medical images affected by scattering or other artifacts.
 Robotics: Improving the performance of robots operating in environments with poor visibility due to haze or dust.
-Augmented Reality: Enhancing the user experience of AR applications by removing haze from the real-world view.
+Augmented Reality: Enhancing the user experience of AR applications by removing haze from the real-world view .
