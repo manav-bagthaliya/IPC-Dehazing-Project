@@ -2,7 +2,6 @@
 
 **Transform hazy images into clear, actionable visuals with advanced deep learning**
 
-![License](https://img.shields.io/badge/License-Pi--Lab%201.0-blue.svg)
 ![Python](https://img.shields.io/badge/Python-3.8%2B-green.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-1.12%2B-orange.svg)
 
@@ -50,14 +49,14 @@ IPC-Dehaze uses **DehazeTokenNet** with VQGAN architecture to reconstruct clear 
 
 ### 🎯 Core Capabilities
 
-- **🌫️ AI-Powered Dehazing**: Transformer + VQGAN architecture for superior haze removal
-- **🚗 Multi-Method Plate Detection**: Combines color-based, edge detection, OpenCV, and YOLO methods
-- **🔍 Smart Plate Enhancement**: Automatic detection and enhancement of license plate regions
-- **📝 OCR Integration**: Text extraction with Indian license plate format validation
-- **🌐 Web Interface**: User-friendly Flask-based UI for non-technical users
-- **⚡ CLI Support**: Full command-line control for batch processing and automation
-- **🔄 Two-Phase Workflow**: Flexible separation of dehazing and plate detection
-- **📦 Batch Processing**: Process entire folders of images efficiently
+- ** AI-Powered Dehazing**: Transformer + VQGAN architecture for superior haze removal
+- ** Multi-Method Plate Detection**: Combines color-based, edge detection, OpenCV, and YOLO methods
+- ** Smart Plate Enhancement**: Automatic detection and enhancement of license plate regions
+- ** OCR Integration**: Text extraction with Indian license plate format validation
+- ** Web Interface**: User-friendly Flask-based UI for non-technical users
+- ** CLI Support**: Full command-line control for batch processing and automation
+- ** Two-Phase Workflow**: Flexible separation of dehazing and plate detection
+- ** Batch Processing**: Process entire folders of images efficiently
 
 ### 🎨 Advanced Features
 
@@ -177,7 +176,7 @@ IPC-Dehaze uses **DehazeTokenNet** with VQGAN architecture to reconstruct clear 
 ### Model Architecture: DehazeTokenNet
 
 ```
-Input Image (H×W×3)
+Input Image
       │
       ▼
 ┌─────────────────┐
@@ -411,63 +410,6 @@ python inference.py -i input/ -o output/ -n 15 --enhance_plates
 python inference.py -i large_batch/ -o results/ --max_size 1200 --dehaze_only
 python detect_plates.py -i results/ -o final/
 ```
-
----
-
-## 📁 Project Structure
-
-```
-IPC-Dehaze/
-│
-├── app.py                          # Flask web application
-├── inference.py                    # Main dehazing pipeline
-├── detect_plates.py                # License plate detection module
-├── setup.py                        # Installation & verification script
-│
-├── requirements.txt                # Python dependencies
-├── requirements_web.txt            # Web-specific dependencies
-├── LICENSE.txt                     # Pi-Lab License 1.0
-├── README.md                       # This file
-│
-├── basicsr/                        # Core model implementation
-│   ├── __init__.py
-│   ├── train.py                   # Training script
-│   ├── test.py                    # Testing utilities
-│   ├── archs/                     # Model architectures
-│   │   ├── dehazeToken_arch.py   # DehazeTokenNet, Critic, Predictor
-│   │   ├── vqgan.py              # VQGAN encoder/decoder
-│   │   ├── network_swinir.py     # Swin Transformer blocks
-│   │   └── fema_utils.py         # Utility modules
-│   ├── data/                      # Data loading & augmentation
-│   ├── losses/                    # Loss functions
-│   ├── models/                    # Training models
-│   └── utils/                     # Helper utilities
-│
-├── options/                        # Training configurations
-│   ├── 01train_FeMaSR_HQ_pretrain_stage.yml
-│   ├── 02train_predictor.yml
-│   └── 03train_critic.yml
-│
-├── pretrained_models/              # Model weights
-│   ├── predictor.pth
-│   └── critic.pth
-│
-├── scripts/                        # Utility scripts
-│   ├── download_pretrained_models.py
-│   ├── download_gdrive.py
-│   └── data_preparation/
-│
-├── templates/                      # Web UI templates
-│   └── index.html
-│
-├── examples/                       # Sample input images
-├── uploads/                        # Web upload storage
-├── web_results/                    # Web processing output
-├── results/                        # CLI output
-└── test_output/                    # Testing output
-```
-
----
 
 ## 🛠️ Technology Stack
 
@@ -706,35 +648,14 @@ Thanks to all contributors, testers, and users who help improve this project!
 
 ## 📞 Support & Contact
 
-- **Issues**: Report bugs via [GitHub Issues](../../issues)
-- **Discussions**: Ask questions in [GitHub Discussions](../../discussions)
-- **Email**: [Contact Pi-Lab](mailto:your-email@example.com)
+- **Email**: [](22it005@charusat.edu.in)
 
 ---
-
-## 🗺️ Roadmap
-
-### Future Enhancements
-
-- [ ] Real-time video dehazing support
-- [ ] Additional license plate formats (EU, US, etc.)
-- [ ] Web API for cloud deployment
-- [ ] Mobile app integration
-- [ ] Improved YOLO model for plates
-- [ ] Benchmark datasets and metrics
-- [ ] Docker containerization
-- [ ] Multi-GPU training support
-- [ ] Model quantization for edge devices
-- [ ] Batch export to CSV/Excel
 
 ### Version History
 
 - **v1.0.0** (Current): Initial release with dehazing and plate detection
 - **v0.9.0**: Beta testing phase
 - **v0.5.0**: Core model implementation
-
----
-
-**Made with ❤️ by Pi-Lab**
 
 _"Clearing the haze, one image at a time"_
