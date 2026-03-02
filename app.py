@@ -7,15 +7,25 @@ import subprocess
 import threading
 import time
 from datetime import datetime
+import sys
 import json
 
 app = Flask(__name__)
-app.secret_key = 'ipc-dehaze-secret-key-2025'
+app.secret_key = os.environ.get('SECRET_KEY', 'ipc-dehaze-secret-key-2025')
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
 
+# Security headers
+@app.after_request
+def after_request(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    return response
+
 # Configuration
-UPLOAD_FOLDER = 'uploads'
-RESULTS_FOLDER = 'web_results'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+RESULTS_FOLDER = os.path.join(BASE_DIR, 'web_results')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'bmp', 'tiff'}
 MAX_IMAGES = 10
 
@@ -40,8 +50,8 @@ def get_image_dimensions(file_path):
         if img is not None:
             height, width = img.shape[:2]
             return width, height
-    except:
-        pass
+    except Exception as e:
+        print(f"Error reading image dimensions: {e}")
     return None, None
 
 @app.route('/')
@@ -55,11 +65,29 @@ def upload_files():
     
     files = request.files.getlist('files')
     
-    if not files or files[0].filename == '':
+    if not files or len(files) == 0 or files[0].filename == '':
         return jsonify({'error': 'No files selected'}), 400
     
     if len(files) > MAX_IMAGES:
         return jsonify({'error': f'Maximum {MAX_IMAGES} images allowed'}), 400
+    
+    # Validate file types and sizes
+    total_size = 0
+    for file in files:
+        if file and not allowed_file(file.filename):
+            return jsonify({'error': f'Invalid file type: {file.filename}'}), 400
+        
+        # Check individual file size (rough estimate)
+        file.seek(0, 2)  # Seek to end
+        file_size = file.tell()
+        file.seek(0)  # Reset to beginning
+        total_size += file_size
+        
+        if file_size > app.config['MAX_CONTENT_LENGTH']:
+            return jsonify({'error': f'File too large: {file.filename}'}), 400
+    
+    if total_size > app.config['MAX_CONTENT_LENGTH']:
+        return jsonify({'error': 'Total file size exceeds limit'}), 400
     
     # Generate unique session ID
     session_id = str(uuid.uuid4())
@@ -122,20 +150,17 @@ def process_images():
     resize_to = data.get('resize_to', 0)
     force_width = data.get('force_width', 0)
     force_height = data.get('force_height', 0)
-    enhance_plates = data.get('enhance_plates', False)
-    selections = data.get('selections', [])  # New parameter for selections
-    canvas_width = data.get('canvas_width', 800)
-    canvas_height = data.get('canvas_height', 600)
-    original_width = data.get('original_width', 0)
-    original_height = data.get('original_height', 0)
+    enhance_plates = data.get('enhance_plates', True)  # Default to True for automatic detection
     
-    # Build command for full image processing
+    # Build command for automatic processing (dehaze + plate detection)
+    script_path = os.path.join(BASE_DIR, 'inference.py')
     cmd_full = [
-        'python', 'inference.py',
+        sys.executable or 'python', script_path,
         '-i', session_upload_dir,
         '-o', session_results_dir,
         '-n', str(num_iterations),
-        '--max_size', str(max_size)
+        '--max_size', str(max_size),
+        '--enhance_plates'  # Enable automatic plate detection
     ]
     
     if resize_to > 0:
@@ -144,29 +169,74 @@ def process_images():
     if force_width > 0 and force_height > 0:
         cmd_full.extend(['--force_width', str(force_width), '--force_height', str(force_height)])
     
-    # Add license plate enhancement flag
-    if enhance_plates:
-        cmd_full.append('--enhance_plates')
+    # Check if model files exist
+    predictor_path = os.path.join(BASE_DIR, 'pretrained_models', 'predictor.pth')
+    critic_path = os.path.join(BASE_DIR, 'pretrained_models', 'critic.pth')
+    
+    if not os.path.exists(predictor_path):
+        return jsonify({'error': f'Model file not found: {predictor_path}. Please ensure the model files are in the pretrained_models folder.'}), 400
+    
+    if not os.path.exists(critic_path):
+        return jsonify({'error': f'Model file not found: {critic_path}. Please ensure the model files are in the pretrained_models folder.'}), 400
     
     try:
-        # Process full image first
-        result_full = subprocess.run(cmd_full, capture_output=True, text=True, cwd=os.getcwd())
+        # Process images with automatic license plate detection
+        result_full = subprocess.run(
+            cmd_full, 
+            capture_output=True, 
+            text=True, 
+            encoding='utf-8',
+            errors='replace',  # Handle Unicode errors gracefully
+            cwd=BASE_DIR,
+            timeout=900  # 15 minute timeout for slower CPUs/large images
+        )
         
-        if result_full.returncode == 0:
-            # Get full image results
+        def collect_results():
             result_files = []
+            dehazed_files = []
+            plate_crops = []
             if os.path.exists(session_results_dir):
                 for file in os.listdir(session_results_dir):
-                    if file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    if file.lower().endswith(('_dehazed.png')):
                         file_path = os.path.join(session_results_dir, file)
                         file_size = get_file_size_mb(file_path)
                         width, height = get_image_dimensions(file_path)
-                        
-                        # Rename to indicate full dehazed result
-                        new_filename = f"full_dehazed_{file}"
-                        new_file_path = os.path.join(session_results_dir, new_filename)
-                        os.rename(file_path, new_file_path)
-                        
+                        dehazed_files.append({
+                            'filename': file,
+                            'size_mb': file_size,
+                            'width': width,
+                            'height': height,
+                            'path': file_path
+                        })
+                    elif file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                        file_path = os.path.join(session_results_dir, file)
+                        file_size = get_file_size_mb(file_path)
+                        width, height = get_image_dimensions(file_path)
+                        # Plate crops
+                        if '_plate_' in file:
+                            plate_crops.append({
+                                'filename': file,
+                                'size_mb': file_size,
+                                'width': width,
+                                'height': height,
+                                'path': file_path
+                            })
+                            continue
+                        # Skip images in subfolders
+                        if os.path.isdir(os.path.join(session_results_dir, file)):
+                            continue
+                        # Rename normal outputs once for clarity
+                        if not file.startswith('processed_') and not file.endswith('_dehazed.png'):
+                            new_filename = f"processed_{file}"
+                            new_file_path = os.path.join(session_results_dir, new_filename)
+                            try:
+                                os.rename(file_path, new_file_path)
+                            except Exception:
+                                new_file_path = file_path
+                                new_filename = file
+                        else:
+                            new_file_path = file_path
+                            new_filename = file
                         result_files.append({
                             'filename': new_filename,
                             'size_mb': file_size,
@@ -174,42 +244,83 @@ def process_images():
                             'height': height,
                             'path': new_file_path
                         })
+            return result_files, dehazed_files, plate_crops
+
+        if result_full.returncode == 0:
+            # Get processed results
+            result_files = []
+            dehazed_files = []
+            plate_crops = []
+            detection_info = []
+            plates_structured = []
             
-                            # Process selected areas if any
-                if selections and len(selections) > 0:
-                    # Create selected areas processing
-                    for i, selection in enumerate(selections):
-                        # Process the selected region
-                        selected_result = process_selected_area(
-                            session_upload_dir, 
-                            session_results_dir, 
-                            selection, 
-                            i + 1,
-                            canvas_width,
-                            canvas_height,
-                            original_width,
-                            original_height
-                        )
-                        if selected_result:
-                            result_files.append(selected_result)
+            result_files, dehazed_files, plate_crops = collect_results()
+            
+            # Parse detection info from stdout
+            stdout_lines = result_full.stdout.split('\n')
+            for line in stdout_lines:
+                if 'Detected' in line and 'license plate' in line:
+                    detection_info.append(line.strip())
+                elif 'Automatically detected and enhanced' in line:
+                    detection_info.append(line.strip())
+                elif 'Recognized plate text:' in line:
+                    detection_info.append(line.strip())
+                elif line.startswith('PLATE_JSON:'):
+                    try:
+                        import json as _json
+                        payload = line.split('PLATE_JSON:', 1)[1].strip()
+                        plate_obj = _json.loads(payload)
+                        plates_structured.append(plate_obj)
+                        # Human-readable echo
+                        if 'formatted_text' in plate_obj and 'confidence' in plate_obj:
+                            detection_info.append(f"Plate: {plate_obj['formatted_text']} | Confidence: {plate_obj['confidence']:.2f}")
+                    except Exception:
+                        pass
             
             return jsonify({
                 'success': True,
-                'message': 'Processing completed successfully',
+                'message': 'Automatic processing completed successfully',
                 'results': result_files,
+                'dehazed_results': dehazed_files,
+                'plate_crops': plate_crops,
                 'command': ' '.join(cmd_full),
                 'enhanced_plates': enhance_plates,
-                'selections_processed': len(selections) if selections else 0
+                'detection_info': detection_info,
+                'plates': plates_structured,
+                'auto_detection': True
             })
         else:
+            # Log to server console for debugging
+            print('\n===== Inference Failed =====')
+            print('Command:', ' '.join(cmd_full))
+            print('Return code:', result_full.returncode)
+            print('STDOUT:\n', result_full.stdout[:4000])
+            print('STDERR:\n', result_full.stderr[:4000])
+            # Fallback: if we still produced any images, return them as partial success
+            result_files, dehazed_files, plate_crops = collect_results()
+            if result_files or dehazed_files or plate_crops:
+                return jsonify({
+                    'success': True,
+                    'message': 'Processing completed with warnings',
+                    'results': result_files,
+                    'dehazed_results': dehazed_files,
+                    'plate_crops': plate_crops,
+                    'command': ' '.join(cmd_full),
+                    'enhanced_plates': enhance_plates,
+                    'detection_info': ['Warning: inference returned non-zero exit code. See server logs for details.'],
+                    'auto_detection': True
+                })
             return jsonify({
                 'error': 'Processing failed',
+                'command': ' '.join(cmd_full),
+                'returncode': result_full.returncode,
                 'stderr': result_full.stderr,
                 'stdout': result_full.stdout
             }), 500
             
     except Exception as e:
         return jsonify({'error': f'Processing error: {str(e)}'}), 500
+
 
 def process_selected_area(upload_dir, results_dir, selection, area_number, canvas_width=800, canvas_height=600, original_width=0, original_height=0):
     """Process a selected area for enhanced output"""

@@ -2,9 +2,12 @@ torch>=1.12.1
 torchaudio
 torchvision
 tqdm
-opencv-python
+opencv-python>=4.8.0
 pyiqa
 timm
 ultralytics>=8.0.0
 easyocr>=1.7.0
 numpy>=1.21.0
+flask>=2.3.0
+werkzeug>=2.3.0
+einops

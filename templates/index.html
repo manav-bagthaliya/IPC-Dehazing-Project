@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,7 +16,7 @@
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #000000 0%, #82e5f1 100%);
             min-height: 100vh;
             color: #333;
         }
@@ -36,7 +37,7 @@
             font-size: 3rem;
             font-weight: 700;
             margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .header p {
@@ -48,13 +49,13 @@
         .main-card {
             background: white;
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             overflow: hidden;
             margin-bottom: 30px;
         }
 
         .card-header {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            background: linear-gradient(135deg, #43c3d4 0%, #dd7c7c 100%);
             color: white;
             padding: 30px;
             text-align: center;
@@ -139,7 +140,7 @@
 
         .file-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
             border-color: #4f46e5;
         }
 
@@ -150,8 +151,8 @@
 
         .file-preview {
             width: 100%;
-            height: 120px;
-            object-fit: cover;
+            height: 160px;
+            object-fit: contain;
             border-radius: 8px;
             margin-bottom: 15px;
             background: #e2e8f0;
@@ -166,7 +167,7 @@
         .file-preview img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
         }
 
         .file-info {
@@ -300,6 +301,55 @@
             border-top: 1px solid #e5e7eb;
         }
 
+        /* Side Panel */
+        .side-panel {
+            position: fixed;
+            top: 0;
+            right: -420px;
+            width: 400px;
+            height: 100vh;
+            background: #ffffff;
+            box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15);
+            z-index: 1500;
+            transition: right 0.35s ease-in-out;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .side-panel.open {
+            right: 0;
+        }
+
+        .side-panel-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #fff;
+        }
+
+        .side-panel-header h3 {
+            font-weight: 700;
+        }
+
+        .side-panel-body {
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .thumb {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 12px;
+        }
+
+        .panel-actions {
+            padding: 14px 16px;
+            border-top: 1px solid #e5e7eb;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
         .results-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -376,6 +426,35 @@
             box-shadow: 0 8px 20px rgba(14, 165, 233, 0.3);
         }
 
+        /* Fullscreen Image Modal */
+        .image-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .image-modal-content {
+            max-width: 95vw;
+            max-height: 95vh;
+            background: #111827;
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .image-modal-content img {
+            max-width: 90vw;
+            max-height: 90vh;
+            display: block;
+            margin: 0 auto;
+        }
+
         .loading {
             display: none;
             text-align: center;
@@ -393,8 +472,13 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         .alert {
@@ -464,6 +548,7 @@
                 opacity: 0;
                 transform: translateY(-50px) scale(0.9);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0) scale(1);
@@ -712,11 +797,17 @@
 
         .result-image {
             width: 100%;
-            max-height: 300px;
+            max-height: 360px;
             object-fit: contain;
             border-radius: 8px;
             margin-bottom: 15px;
             border: 1px solid #d1d5db;
+            background-image: linear-gradient(45deg, #eee 25%, transparent 25%),
+                linear-gradient(-45deg, #eee 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #eee 75%),
+                linear-gradient(-45deg, transparent 75%, #eee 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
         }
 
         .result-download {
@@ -734,8 +825,126 @@
             transform: translateY(-2px);
             box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
         }
+
+        /* Auto Detection Styles */
+        .auto-detection-info {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .info-card {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 2px solid #0ea5e9;
+            border-radius: 15px;
+            padding: 25px;
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+        }
+
+        .info-icon {
+            font-size: 3rem;
+            color: #0ea5e9;
+            margin-top: 5px;
+        }
+
+        .info-content h4 {
+            color: #0c4a6e;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .info-content p {
+            color: #0369a1;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .detection-features {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 20px;
+        }
+
+        .detection-features li {
+            padding: 8px 0;
+            color: #0369a1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .detection-features li i {
+            color: #10b981;
+            font-size: 0.9rem;
+        }
+
+        .detection-status {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #0ea5e9;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .status-text {
+            color: #0c4a6e;
+            font-weight: 600;
+        }
+
+        .status-icon {
+            font-size: 1.5rem;
+        }
+
+        .auto-results {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .detection-info-section {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 15px;
+            padding: 25px;
+        }
+
+        .detection-info-section h4 {
+            color: #374151;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+
+        .detection-info {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            min-height: 100px;
+        }
+
+        .detection-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+
+        .detection-item:last-child {
+            border-bottom: none;
+        }
+
+        .detection-item i {
+            color: #10b981;
+            margin-right: 8px;
+        }
     </style>
 </head>
+
 <body>
     <!-- Welcome Modal -->
     <div class="modal-overlay" id="welcomeModal">
@@ -787,39 +996,31 @@
                 <div class="uploaded-files" id="uploadedFiles" style="display: none;">
                     <h3><i class="fas fa-images"></i> Uploaded Images</h3>
                     <p style="color: #6b7280; margin-bottom: 15px; font-size: 0.9rem;">
-                        <i class="fas fa-info-circle"></i> Click on any image to load it in the selection tool below
+                        <i class="fas fa-magic"></i> License plates will be automatically detected and enhanced
                     </p>
                     <div class="file-grid" id="fileGrid"></div>
                 </div>
 
-                <div class="image-selection" id="imageSelection" style="display: none;">
-                    <h3><i class="fas fa-crop"></i> Select License Plate Regions</h3>
-                    <p style="color: #6b7280; margin-bottom: 15px; font-size: 0.9rem;">
-                        <i class="fas fa-mouse-pointer"></i> Click and drag on the image below to select license plate areas
-                    </p>
-                    <div class="selection-container">
-                        <div class="image-preview-container">
-                            <canvas id="selectionCanvas" width="800" height="600"></canvas>
-                            <div class="selection-controls">
-                                <button class="btn btn-secondary" id="clearSelectionBtn">
-                                    <i class="fas fa-eraser"></i> Clear Selection
-                                </button>
-                                <button class="btn btn-primary" id="confirmSelectionBtn">
-                                    <i class="fas fa-check"></i> Confirm Selection
-                                </button>
-                            </div>
+                <div class="auto-detection-info" id="autoDetectionInfo" style="display: none;">
+                    <div class="info-card">
+                        <div class="info-icon">
+                            <i class="fas fa-robot"></i>
                         </div>
-                        <div class="selection-instructions">
-                            <h4><i class="fas fa-info-circle"></i> How to Select:</h4>
-                            <ol>
-                                <li>Click and drag to draw selection boxes around license plates</li>
-                                <li>You can select multiple regions</li>
-                                <li>Each selection will be enhanced separately</li>
-                                <li>Click "Confirm Selection" when done</li>
-                            </ol>
-                            <div class="selection-status" id="selectionStatus">
-                                <span class="status-text">No regions selected</span>
-                                <span class="selection-count">0 regions</span>
+                        <div class="info-content">
+                            <h4><i class="fas fa-brain"></i> Automatic License Plate Detection</h4>
+                            <p>Our AI will automatically detect and enhance license plates including:</p>
+                            <ul class="detection-features">
+                                <li><i class="fas fa-star"></i> <strong>Yellow license plates</strong> (commercial
+                                    vehicles) - Primary focus</li>
+                                <li><i class="fas fa-star"></i> <strong>White license plates</strong> (private vehicles)
+                                    - High priority</li>
+                                <li><i class="fas fa-check-circle"></i> Blue license plates (government vehicles)</li>
+                                <li><i class="fas fa-check-circle"></i> Other colored plates using advanced detection
+                                </li>
+                            </ul>
+                            <div class="detection-status">
+                                <span class="status-text">Ready for automatic processing</span>
+                                <span class="status-icon">🤖</span>
                             </div>
                         </div>
                     </div>
@@ -855,16 +1056,17 @@
                         </div>
                         <div class="option-group">
                             <label class="option-label">
-                                <input type="checkbox" id="enhancePlates" class="option-checkbox">
-                                <span class="checkbox-label">Enhance License Plates</span>
+                                <input type="checkbox" id="enhancePlates" class="option-checkbox" checked disabled>
+                                <span class="checkbox-label">Automatic License Plate Enhancement</span>
                             </label>
-                            <div class="option-hint">Automatically detect and enhance license plates for better readability</div>
+                            <div class="option-hint">Always enabled - AI automatically detects and enhances license
+                                plates</div>
                         </div>
                     </div>
 
                     <div class="action-buttons">
                         <button class="btn btn-primary" id="processBtn">
-                            <i class="fas fa-magic"></i> Process Images
+                            <i class="fas fa-magic"></i> Process Images (Clear Fog + Detect Plates)
                         </button>
                         <button class="btn btn-secondary" id="clearBtn">
                             <i class="fas fa-trash"></i> Clear All
@@ -909,18 +1111,30 @@
                 </div>
 
                 <div class="results-section">
-                    <h3><i class="fas fa-images"></i> Dual Results</h3>
-                    <div class="dual-results" id="dualResults">
+                    <h3><i class="fas fa-images"></i> Processing Results</h3>
+                    <div class="auto-results" id="autoResults">
                         <div class="result-section">
-                            <h4><i class="fas fa-globe"></i> Full Image Dehazed</h4>
-                            <div id="fullImageResult">
-                                <p>Full dehazed image will appear here</p>
+                            <h4><i class="fas fa-broom"></i> Clear Images (Fog Removed)</h4>
+                            <div id="dehazedResults">
+                                <p>Clear dehazed images will appear here</p>
                             </div>
                         </div>
                         <div class="result-section">
-                            <h4><i class="fas fa-crop"></i> Selected Areas Enhanced</h4>
-                            <div id="selectedAreasResult">
-                                <p>Enhanced license plate regions will appear here</p>
+                            <h4><i class="fas fa-magic"></i> Enhanced License Plates</h4>
+                            <div id="processedResults">
+                                <p>Images with detected and enhanced license plates will appear here</p>
+                            </div>
+                        </div>
+                        <div class="result-section">
+                            <h4><i class="fas fa-search-plus"></i> Plate Crops (Zoomed)</h4>
+                            <div id="plateCrops">
+                                <p>Zoomed plate crops will appear here</p>
+                            </div>
+                        </div>
+                        <div class="detection-info-section">
+                            <h4><i class="fas fa-robot"></i> Detection Information</h4>
+                            <div id="detectionInfo">
+                                <p>License plate detection details will appear here</p>
                             </div>
                         </div>
                     </div>
@@ -935,6 +1149,14 @@
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+
+    <!-- Fullscreen Image Modal -->
+    <div class="image-modal-overlay" id="imageModal" onclick="app.closeImageModal()">
+        <div class="image-modal-content">
+            <img id="imageModalImg" src="" alt="Preview">
         </div>
     </div>
 
@@ -966,10 +1188,7 @@
                 document.getElementById('clearBtn').addEventListener('click', this.clearAll.bind(this));
                 document.getElementById('downloadAllBtn').addEventListener('click', this.downloadAll.bind(this));
                 document.getElementById('newSessionBtn').addEventListener('click', this.newSession.bind(this));
-                
-                // New selection tool events
-                document.getElementById('clearSelectionBtn').addEventListener('click', this.clearSelection.bind(this));
-                document.getElementById('confirmSelectionBtn').addEventListener('click', this.confirmSelection.bind(this));
+
             }
 
             handleDragOver(e) {
@@ -995,7 +1214,7 @@
 
             async processFiles(files) {
                 const imageFiles = files.filter(file => file.type.startsWith('image/'));
-                
+
                 if (imageFiles.length === 0) {
                     this.showAlert('Please select valid image files', 'error');
                     return;
@@ -1037,17 +1256,17 @@
             displayFiles() {
                 const fileGrid = document.getElementById('fileGrid');
                 const uploadedFiles = document.getElementById('uploadedFiles');
-                const imageSelection = document.getElementById('imageSelection');
+                const autoDetectionInfo = document.getElementById('autoDetectionInfo');
 
                 fileGrid.innerHTML = '';
-                
+
                 this.uploadedFiles.forEach(file => {
                     const fileCard = document.createElement('div');
                     fileCard.className = 'file-card';
-                    
+
                     // Create image preview using FileReader
                     const preview = this.createImagePreview(file);
-                    
+
                     fileCard.innerHTML = `
                         ${preview}
                         <div class="file-info">
@@ -1058,45 +1277,53 @@
                             </div>
                         </div>
                     `;
-                    
-                    // Add click event to load this image in the selection tool
-                    fileCard.style.cursor = 'pointer';
-                    fileCard.addEventListener('click', () => {
-                        // Clear previous selections when switching images
-                        this.selections = [];
-                        this.updateSelectionStatus();
-                        this.loadImageToCanvasFromFile(file);
-                        // Highlight selected file
-                        document.querySelectorAll('.file-card').forEach(card => card.style.border = '1px solid #e2e8f0');
-                        fileCard.style.border = '2px solid #4f46e5';
-                    });
-                    
+
+                    // Add click-to-enlarge on the preview image
+                    setTimeout(() => {
+                        const imgEl = fileCard.querySelector('img[data-filename="' + file.filename.replace(/"/g, '&quot;') + '"]');
+                        if (imgEl) {
+                            imgEl.addEventListener('click', () => this.openImageModal(imgEl.src));
+                            imgEl.style.cursor = 'zoom-in';
+                            imgEl.title = 'Click to view full size';
+                        }
+                    }, 0);
+
                     fileGrid.appendChild(fileCard);
                 });
 
                 uploadedFiles.style.display = 'block';
-                imageSelection.style.display = 'block';
-                
-                // Initialize selection tool and load first image
-                this.initSelectionTool();
-                if (this.uploadedFiles.length > 0) {
-                    // Load the actual image file from the upload
-                    this.loadImageToCanvasFromFile(this.uploadedFiles[0]);
-                    // Highlight first file as selected
-                    const firstCard = fileGrid.querySelector('.file-card');
-                    if (firstCard) {
-                        firstCard.style.border = '2px solid #4f46e5';
-                    }
-                }
+                autoDetectionInfo.style.display = 'block';
+
+                // Show processing options immediately
+                document.getElementById('processingOptions').style.display = 'block';
             }
 
             createImagePreview(file) {
-                // For uploaded files, we'll show a placeholder since we don't have the actual file object
-                // In a real implementation, you'd store the File object and create a preview
+                // Try to create a preview using the uploaded File object if available
+                const actual = this.actualUploadedFiles.find(f => f.name === file.filename);
+                if (actual) {
+                    const url = URL.createObjectURL(actual);
+                    return `<div class="file-preview"><img data-filename="${file.filename}" src="${url}" alt="${file.filename}"></div>`;
+                }
+                // Fallback placeholder
                 return `<div class="file-preview">
                     <i class="fas fa-image"></i>
                     <div style="font-size: 0.8rem; margin-top: 5px;">${file.filename}</div>
                 </div>`;
+            }
+
+            openImageModal(src) {
+                const overlay = document.getElementById('imageModal');
+                const img = document.getElementById('imageModalImg');
+                img.src = src;
+                overlay.style.display = 'flex';
+            }
+
+            closeImageModal() {
+                const overlay = document.getElementById('imageModal');
+                const img = document.getElementById('imageModalImg');
+                img.src = '';
+                overlay.style.display = 'none';
             }
 
             async processImages() {
@@ -1117,19 +1344,14 @@
                     progressFill.style.width = progress + '%';
                 }, 500);
 
-                                 const params = {
-                     num_iterations: parseInt(document.getElementById('numIterations').value),
-                     max_size: parseInt(document.getElementById('maxSize').value),
-                     resize_to: parseInt(document.getElementById('resizeTo').value),
-                     force_width: parseInt(document.getElementById('forceWidth').value),
-                     force_height: parseInt(document.getElementById('forceHeight').value),
-                     enhance_plates: document.getElementById('enhancePlates').checked,
-                     selections: this.selections || [],
-                     canvas_width: this.canvasDisplayWidth || 800,
-                     canvas_height: this.canvasDisplayHeight || 600,
-                     original_width: this.originalImageWidth || 0,
-                     original_height: this.originalImageHeight || 0
-                 };
+                const params = {
+                    num_iterations: parseInt(document.getElementById('numIterations').value),
+                    max_size: parseInt(document.getElementById('maxSize').value),
+                    resize_to: parseInt(document.getElementById('resizeTo').value),
+                    force_width: parseInt(document.getElementById('forceWidth').value),
+                    force_height: parseInt(document.getElementById('forceHeight').value),
+                    enhance_plates: true  // Always true for automatic detection
+                };
 
                 try {
                     const response = await fetch('/process', {
@@ -1148,7 +1370,7 @@
                     if (result.success) {
                         setTimeout(() => {
                             loading.style.display = 'none';
-                            this.displayResults(result.results);
+                            this.displayResults(result);
                             this.showAlert(result.message, 'success');
                         }, 1000);
                     } else {
@@ -1164,62 +1386,155 @@
                 }
             }
 
-            displayResults(results) {
+            async processImages() {
+                const btn = document.getElementById('processBtn');
+                const loading = document.getElementById('loading');
+                const progressBar = document.getElementById('progressBar');
+                const progressFill = document.getElementById('progressFill');
+
+                btn.disabled = true;
+                loading.style.display = 'block';
+                progressBar.style.display = 'block';
+
+                // Simulate progress
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += Math.random() * 20;
+                    if (progress > 95) progress = 95;
+                    progressFill.style.width = progress + '%';
+                }, 500);
+
+                const params = {
+                    num_iterations: parseInt(document.getElementById('numIterations').value),
+                    max_size: parseInt(document.getElementById('maxSize').value),
+                    resize_to: parseInt(document.getElementById('resizeTo').value),
+                    force_width: parseInt(document.getElementById('forceWidth').value),
+                    force_height: parseInt(document.getElementById('forceHeight').value)
+                };
+
+                try {
+                    const response = await fetch('/process', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(params)
+                    });
+
+                    const result = await response.json();
+
+                    clearInterval(progressInterval);
+                    progressFill.style.width = '100%';
+
+                    if (result.success) {
+                        setTimeout(() => {
+                            loading.style.display = 'none';
+                            this.displayResults(result);
+                            this.showAlert(result.message, 'success');
+                        }, 1000);
+                    } else {
+                        loading.style.display = 'none';
+                        this.showAlert(result.error, 'error');
+                    }
+                } catch (error) {
+                    clearInterval(progressInterval);
+                    loading.style.display = 'none';
+                    this.showAlert('Processing failed: ' + error.message, 'error');
+                } finally {
+                    btn.disabled = false;
+                }
+            }
+
+
+            displayResults(apiResult) {
                 const resultsCard = document.getElementById('resultsCard');
-                const dualResults = document.getElementById('dualResults');
                 const statsBar = document.getElementById('statsBar');
 
-                // Display full image result
-                const fullImageResult = document.getElementById('fullImageResult');
-                if (results.length > 0) {
-                    const fullResult = results.find(r => r.filename.includes('full_dehazed'));
-                    if (fullResult) {
-                        fullImageResult.innerHTML = `
-                            <img src="/download/${this.sessionId}/${fullResult.filename}" class="result-image" alt="Full Dehazed">
-                            <a href="/download/${this.sessionId}/${fullResult.filename}" class="result-download">
-                                <i class="fas fa-download"></i> Download Full Image
-                            </a>
-                        `;
-                    }
-                }
+                // Display processed results
+                const processedResults = document.getElementById('processedResults');
+                const dehazedResults = document.getElementById('dehazedResults');
+                const plateCrops = document.getElementById('plateCrops');
+                const detectionInfo = document.getElementById('detectionInfo');
 
-                // Display selected areas result
-                const selectedAreasResult = document.getElementById('selectedAreasResult');
-                const selectedResults = results.filter(r => r.filename.includes('selected_enhanced'));
-                if (selectedResults.length > 0) {
-                    let selectedHTML = '';
-                    selectedResults.forEach((result, index) => {
-                        selectedHTML += `
-                            <div style="margin-bottom: 15px;">
-                                <img src="/download/${this.sessionId}/${result.filename}" class="result-image" alt="Selected Area ${index + 1}">
+                const results = apiResult.results || [];
+                const dehazed = apiResult.dehazed_results || [];
+                const crops = apiResult.plate_crops || [];
+
+                // Dehazed images
+                if (dehazed.length > 0) {
+                    let dhtml = '';
+                    dehazed.forEach((item, index) => {
+                        dhtml += `
+                            <div style="margin-bottom: 20px;">
+                                <img src="/download/${this.sessionId}/${item.filename}" class="result-image" alt="Dehazed Image ${index + 1}" style="max-width: 100%; height: auto;">
                                 <div style="margin-top: 10px;">
-                                    <a href="/download/${this.sessionId}/${result.filename}" class="result-download">
-                                        <i class="fas fa-download"></i> Download Area ${index + 1}
+                                    <a href="/download/${this.sessionId}/${item.filename}" class="result-download">
+                                        <i class="fas fa-download"></i> Download Dehazed Image ${index + 1}
                                     </a>
                                 </div>
                             </div>
                         `;
                     });
-                    selectedAreasResult.innerHTML = selectedHTML;
+                    dehazedResults.innerHTML = dhtml;
+                } else {
+                    dehazedResults.innerHTML = '<p style="color:#6b7280">No dehazed images found</p>';
+                }
+
+                // Processed results
+                if (results.length > 0) {
+                    let resultsHTML = '';
+                    results.forEach((result, index) => {
+                        resultsHTML += `
+                            <div style="margin-bottom: 20px;">
+                                <img src="/download/${this.sessionId}/${result.filename}" class="result-image" alt="Processed Image ${index + 1}" style="max-width: 100%; height: auto;">
+                                <div style="margin-top: 10px;">
+                                    <a href="/download/${this.sessionId}/${result.filename}" class="result-download">
+                                        <i class="fas fa-download"></i> Download Processed Image ${index + 1}
+                                    </a>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    processedResults.innerHTML = resultsHTML;
+                } else {
+                    processedResults.innerHTML = '<p style="color:#6b7280">No processed images found</p>';
+                }
+
+                // Plate crops
+                if (crops.length > 0) {
+                    let chtml = '';
+                    crops.forEach((item, index) => {
+                        chtml += `
+                            <div style="margin-bottom: 10px;">
+                                <img src="/download/${this.sessionId}/${item.filename}" class="result-image" alt="Plate Crop ${index + 1}" style="max-width: 100%; height: auto;">
+                            </div>
+                        `;
+                    });
+                    plateCrops.innerHTML = chtml;
+                } else {
+                    plateCrops.innerHTML = '<p style="color:#6b7280">No plate crops found</p>';
+                }
+
+                // Display detection information
+                const infoList = apiResult.detection_info || [];
+                if (infoList.length > 0) {
+                    let detectionHTML = '';
+                    infoList.forEach(info => {
+                        detectionHTML += `<div class="detection-item"><i class="fas fa-check-circle"></i> ${info}</div>`;
+                    });
+                    detectionInfo.innerHTML = detectionHTML;
+                } else {
+                    detectionInfo.innerHTML = '<div class="detection-item"><i class="fas fa-info-circle"></i> No license plates detected</div>';
                 }
 
                 // Update stats
-                document.getElementById('totalImages').textContent = results.length;
+                document.getElementById('totalImages').textContent = results.length + dehazed.length;
                 document.getElementById('processedImages').textContent = results.length;
-                let totalSize = results.reduce((sum, r) => sum + r.size_mb, 0);
+                let totalSize = results.reduce((sum, r) => sum + r.size_mb, 0) + dehazed.reduce((s, r) => s + r.size_mb, 0);
                 document.getElementById('totalSize').textContent = totalSize.toFixed(1);
 
                 statsBar.style.display = 'block';
                 resultsCard.style.display = 'block';
             }
 
-            createResultPreview(result) {
-                // Try to load the actual result image
-                return `<div class="result-preview">
-                    <i class="fas fa-check-circle"></i>
-                    <div style="font-size: 0.8rem; margin-top: 5px;">${result.filename}</div>
-                </div>`;
-            }
 
             async downloadAll() {
                 // This would need to be implemented as a zip download on the backend
@@ -1240,21 +1555,21 @@
                 this.uploadedFiles = [];
                 this.actualUploadedFiles = [];
                 this.sessionId = null;
-                
+
                 // Clear canvas
                 if (this.canvas && this.ctx) {
                     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                     this.currentImage = null;
                     this.selections = [];
                 }
-                
+
                 document.getElementById('uploadedFiles').style.display = 'none';
                 document.getElementById('imageSelection').style.display = 'none';
                 document.getElementById('processingOptions').style.display = 'none';
                 document.getElementById('resultsCard').style.display = 'none';
                 document.getElementById('statsBar').style.display = 'none';
                 document.getElementById('fileInput').value = '';
-                
+
                 this.showAlert('All files cleared', 'success');
             }
 
@@ -1262,7 +1577,7 @@
                 try {
                     const response = await fetch('/status');
                     const status = await response.json();
-                    
+
                     if (status.has_files) {
                         this.sessionId = status.session_id;
                         // Could restore session state here
@@ -1277,7 +1592,7 @@
                 alert.textContent = message;
                 alert.className = `alert alert-${type}`;
                 alert.style.display = 'block';
-                
+
                 setTimeout(() => {
                     alert.style.display = 'none';
                 }, 5000);
@@ -1359,7 +1674,7 @@
                     this.ctx.lineWidth = 3;
                     this.ctx.setLineDash([]);
                     this.ctx.strokeRect(selection.x, selection.y, selection.width, selection.height);
-                    
+
                     // Add selection number
                     this.ctx.fillStyle = '#00ff00';
                     this.ctx.font = '16px Arial';
@@ -1379,7 +1694,7 @@
             updateSelectionStatus() {
                 const statusText = document.querySelector('.status-text');
                 const selectionCount = document.querySelector('.selection-count');
-                
+
                 if (this.selections.length === 0) {
                     statusText.textContent = 'No regions selected';
                     selectionCount.textContent = '0 regions';
@@ -1398,83 +1713,83 @@
                 // Hide selection tool and show processing options
                 document.getElementById('imageSelection').style.display = 'none';
                 document.getElementById('processingOptions').style.display = 'block';
-                
+
                 this.showAlert(`Confirmed ${this.selections.length} selection(s)`, 'success');
             }
 
-                         loadImageToCanvas(imageFile) {
-                 return new Promise((resolve) => {
-                     const img = new Image();
-                     img.onload = () => {
-                         // Calculate canvas size to fit image with better aspect ratio handling
-                         const maxWidth = 800;
-                         const maxHeight = 600;
-                         let { width, height } = img;
-                         
-                         // Calculate aspect ratios
-                         const imageAspect = width / height;
-                         const canvasAspect = maxWidth / maxHeight;
-                         
-                         let canvasWidth, canvasHeight;
-                         
-                         if (imageAspect > canvasAspect) {
-                             // Image is wider than canvas
-                             canvasWidth = maxWidth;
-                             canvasHeight = maxWidth / imageAspect;
-                         } else {
-                             // Image is taller than canvas
-                             canvasHeight = maxHeight;
-                             canvasWidth = maxHeight * imageAspect;
-                         }
-                         
-                         // Store original image dimensions for coordinate scaling
-                         this.originalImageWidth = width;
-                         this.originalImageHeight = height;
-                         this.canvasDisplayWidth = canvasWidth;
-                         this.canvasDisplayHeight = canvasHeight;
-                         
-                         this.canvas.width = canvasWidth;
-                         this.canvas.height = canvasHeight;
-                         
-                         // Draw image
-                         this.ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
-                         this.currentImage = img;
-                         
-                         // Show success message briefly
-                         this.ctx.fillStyle = '#10b981';
-                         this.ctx.font = '14px Arial';
-                         this.ctx.textAlign = 'center';
-                         this.ctx.fillText('Image loaded! Draw selection boxes around license plates', canvasWidth / 2, canvasHeight - 20);
-                         
-                         // Clear the message after 3 seconds
-                         setTimeout(() => {
-                             if (this.currentImage === img) {
-                                 this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-                                 this.ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
-                             }
-                         }, 3000);
-                         
-                         resolve();
-                     };
-                     img.src = URL.createObjectURL(imageFile);
-                 });
-             }
+            loadImageToCanvas(imageFile) {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        // Calculate canvas size to fit image with better aspect ratio handling
+                        const maxWidth = 800;
+                        const maxHeight = 600;
+                        let { width, height } = img;
+
+                        // Calculate aspect ratios
+                        const imageAspect = width / height;
+                        const canvasAspect = maxWidth / maxHeight;
+
+                        let canvasWidth, canvasHeight;
+
+                        if (imageAspect > canvasAspect) {
+                            // Image is wider than canvas
+                            canvasWidth = maxWidth;
+                            canvasHeight = maxWidth / imageAspect;
+                        } else {
+                            // Image is taller than canvas
+                            canvasHeight = maxHeight;
+                            canvasWidth = maxHeight * imageAspect;
+                        }
+
+                        // Store original image dimensions for coordinate scaling
+                        this.originalImageWidth = width;
+                        this.originalImageHeight = height;
+                        this.canvasDisplayWidth = canvasWidth;
+                        this.canvasDisplayHeight = canvasHeight;
+
+                        this.canvas.width = canvasWidth;
+                        this.canvas.height = canvasHeight;
+
+                        // Draw image
+                        this.ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+                        this.currentImage = img;
+
+                        // Show success message briefly
+                        this.ctx.fillStyle = '#10b981';
+                        this.ctx.font = '14px Arial';
+                        this.ctx.textAlign = 'center';
+                        this.ctx.fillText('Image loaded! Draw selection boxes around license plates', canvasWidth / 2, canvasHeight - 20);
+
+                        // Clear the message after 3 seconds
+                        setTimeout(() => {
+                            if (this.currentImage === img) {
+                                this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+                                this.ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+                            }
+                        }, 3000);
+
+                        resolve();
+                    };
+                    img.src = URL.createObjectURL(imageFile);
+                });
+            }
 
             loadImageToCanvasFromFile(fileInfo) {
                 console.log('Loading image:', fileInfo);
                 console.log('Available files:', this.actualUploadedFiles);
-                
+
                 // Show loading state
                 const canvas = document.getElementById('selectionCanvas');
                 const ctx = canvas.getContext('2d');
-                
+
                 // Clear canvas and show loading message
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#6b7280';
                 ctx.font = '16px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText('Loading image...', canvas.width / 2, canvas.height / 2);
-                
+
                 // Get the actual file from the stored files
                 const actualFile = this.actualUploadedFiles.find(f => f.name === fileInfo.filename);
                 if (actualFile) {
@@ -1505,9 +1820,10 @@
             } else {
                 document.getElementById('welcomeModal').style.display = 'none';
             }
-            
-            new IPCDehazeApp();
+
+            window.app = new IPCDehazeApp();
         });
     </script>
 </body>
+
 </html>
