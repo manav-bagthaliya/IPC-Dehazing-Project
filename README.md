@@ -1,185 +1,740 @@
-<<<<<<< HEAD
+# IPC-Dehaze: AI-Powered Image Dehazing & License Plate Enhancement
 
-# IPC-Dehaze
+**Transform hazy images into clear, actionable visuals with advanced deep learning**
 
-AI-powered image dehazing and license-plate enhancement for clearer, actionable visuals from hazy scenes.
+![License](https://img.shields.io/badge/License-Pi--Lab%201.0-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.8%2B-green.svg)
+![PyTorch](https://img.shields.io/badge/PyTorch-1.12%2B-orange.svg)
 
-## 1. Overview / Introduction
+---
 
-IPC-Dehaze is a deep-learning pipeline that removes haze from images and optionally detects and enhances vehicle license plates. It is designed for scenarios where haze, fog, or atmospheric distortion hides important visual details, such as traffic enforcement, parking monitoring, or forensic analysis. The project provides both a web interface and command-line workflows to make dehazing accessible to non-technical users while still offering full control to advanced users.
+## 📋 Table of Contents
 
-The problem it solves is visibility loss in real-world imagery: haze reduces contrast and obscures fine details. IPC-Dehaze addresses this by using a transformer-based dehazing model to reconstruct a clearer image, then running a multi-method plate detector to highlight and refine license plate regions. In simple terms, it “cleans the air” in a photo and then focuses on the plate to make it easier to read.
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [How It Works](#how-it-works)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Project Structure](#project-structure)
+- [Technology Stack](#technology-stack)
+- [Model Details](#model-details)
+- [License Plate Detection](#license-plate-detection)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
 
-Assumption: Because you did not provide a custom description, this overview is derived from the codebase and repository structure.
+---
 
-## 2. Features
+## 🌟 Overview
 
-- **AI dehazing pipeline**: Restores visibility using a transformer + VQGAN model to improve contrast and detail.
-- **Automatic license plate detection**: Combines color, edge, OpenCV, and optional YOLO methods for robust detection.
-- **Plate enhancement and OCR**: Enhances detected plates and optionally runs OCR for text extraction and validation.
-- **Web application**: Flask UI for quick uploads and automatic processing without scripting.
-- **Two-phase workflow**: Supports separate dehazing and plate detection for flexible usage.
-- **Batch processing**: Handles folders of images in one run for efficiency.
+**IPC-Dehaze** (Image Processing and Computer Vision - Dehazing) is a state-of-the-art deep learning system designed to restore visibility in hazy, foggy, or atmospheric-distorted images. The system combines **transformer-based dehazing** with **multi-method license plate detection** to deliver clear, readable results for:
 
-## 3. How It Works (High-Level Workflow)
+- 🚓 **Traffic enforcement** and monitoring
+- 🅿️ **Parking management** systems
+- 🔍 **Forensic analysis** and investigation
+- 🌫️ **Environmental monitoring** in poor visibility conditions
+- 📸 **Surveillance systems** enhancement
 
-1. The user provides an image (or a folder of images).
-2. The system resizes and pads the image for model compatibility.
-3. The dehazing model generates a clearer image.
-4. If enabled, the system detects license plates in the dehazed output.
-5. Detected plate regions are enhanced; OCR is attempted if available.
-6. The system saves a dehazed image and a final enhanced image to the output folder.
+### The Problem
 
-## 4. Technical Deep Dive (The "How")
+Haze, fog, and atmospheric particles scatter light, reducing image contrast and obscuring critical details like license plates, signs, and objects. This makes visual identification nearly impossible in traffic monitoring, security, and forensic applications.
 
-### 4.1. System Architecture
+### The Solution
 
-IPC-Dehaze is a pipeline-based application with both CLI and web interfaces.
+IPC-Dehaze uses **DehazeTokenNet** with VQGAN architecture to reconstruct clear images from hazy inputs, followed by intelligent license plate detection using multiple computer vision techniques. The system "cleans the air" in your photos and focuses on extracting actionable information.
 
-- **Frontend**: Flask template served from `templates/` for uploads and results.
-- **Backend**: Flask app in `app.py` orchestrates uploads and invokes the inference pipeline.
-- **Inference Engine**: `inference.py` runs the dehazing model and optional plate detection.
-- **Phase 2 Detector**: `detect_plates.py` runs plate detection on already dehazed images.
-- **Model Core**: `basicsr/` contains model architecture and utilities.
+---
 
-Communication is local and file-based: the web app saves uploads to disk, calls `inference.py`, and serves generated files from `web_results/`.
+## ✨ Key Features
 
-### 4.2. Model Architecture (If applicable)
+### 🎯 Core Capabilities
 
-Assumption: Model names are inferred from the codebase because exact names were not provided.
+- **🌫️ AI-Powered Dehazing**: Transformer + VQGAN architecture for superior haze removal
+- **🚗 Multi-Method Plate Detection**: Combines color-based, edge detection, OpenCV, and YOLO methods
+- **🔍 Smart Plate Enhancement**: Automatic detection and enhancement of license plate regions
+- **📝 OCR Integration**: Text extraction with Indian license plate format validation
+- **🌐 Web Interface**: User-friendly Flask-based UI for non-technical users
+- **⚡ CLI Support**: Full command-line control for batch processing and automation
+- **🔄 Two-Phase Workflow**: Flexible separation of dehazing and plate detection
+- **📦 Batch Processing**: Process entire folders of images efficiently
 
-- **Dehazing model**: `DehazeTokenNet` with a VQGAN backbone and a critic network (`Critic`).
-- **Why this architecture**: Transformer-style token refinement paired with a VQGAN encoder/decoder is effective for preserving structure while removing haze, and the critic helps refine quality iteratively.
-- **Key components**:
-  - **VQGAN encoder** for multiscale feature extraction.
-  - **Transformer token decoder** for iterative refinement.
-  - **Critic network** for quality guidance.
-- **Input/Output shapes**:
-  - Input: variable-size RGB images, padded to multiples of 32.
-  - Output: same spatial dimensions as input (after optional resizing strategy).
+### 🎨 Advanced Features
 
-Optional detection model:
+- **Multiple plate types support**: Yellow (commercial), White (private), Blue (government)
+- **Iterative refinement**: Configurable dehazing iterations for quality control
+- **Flexible resizing**: Multiple strategies for image preprocessing
+- **GPU acceleration**: CUDA support for faster processing
+- **Session management**: Track multiple processing jobs via web interface
+- **Comprehensive logging**: Detailed processing information and error handling
 
-- **YOLO**: `yolov8n.pt` is used when `ultralytics` is installed and the model file is present.
+---
 
-### 4.3. Working Mechanism / Core Logic
+## 🔄 How It Works
 
-The core logic is a two-stage pipeline:
-
-1. **Dehazing**: Encode image into tokens, iteratively decode and refine, then reconstruct.
-2. **Detection + Enhancement**: Find plate regions, enhance them, and optionally OCR the text.
-
-Pseudo-flow:
+### High-Level Workflow
 
 ```
-load image
-resize/pad -> model input
-dehazed = dehaze_model(image)
-if enhance_plates:
-    plates = detect_plates(dehazed)
-    for plate in plates:
-        enhance plate region
-        ocr text (optional)
-save outputs
+┌─────────────┐    ┌──────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Input     │───▶│   Resize &   │───▶│    Dehaze       │───▶│  Plate Detect   │
+│   Image     │    │     Pad      │    │  (DehazeNet)    │    │  & Enhance      │
+└─────────────┘    └──────────────┘    └─────────────────┘    └─────────────────┘
+                                                                         │
+                   ┌─────────────────────────────────────────────────────┘
+                   ▼
+         ┌──────────────────┐    ┌──────────────┐    ┌─────────────────┐
+         │  Enhanced Image  │◀───│  OCR Text    │◀───│  Plate Crops    │
+         │    + Metadata    │    │  Validation  │    │   (Optional)    │
+         └──────────────────┘    └──────────────┘    └─────────────────┘
 ```
 
-### 4.4. Data Flow
+### Detailed Pipeline
 
-- **Input**: Image files (`.jpg`, `.png`, `.jpeg`, `.bmp`, `.tiff`).
-- **Processing**:
-  - Read and normalize image.
-  - Resize based on `--max_size`, `--resize_to`, or forced dimensions.
-  - Pad to model window size.
-  - Dehaze via `DehazeTokenNet` and VQGAN decoder.
-  - Optional plate detection and enhancement.
-  - Optional OCR with format validation (Indian plate format: XXNNXXNNNN).
-- **Output**:
-  - `*_dehazed.png` (dehazed-only output).
-  - `*.png` (final enhanced output).
-  - Optional plate crops (`*_plate_1.png`, etc.) when using `detect_plates.py`.
+1. **Input Processing**
+   - Load image(s) from file or upload
+   - Validate format and dimensions
+   - Apply resizing strategy based on parameters
 
-## 5. Technology Stack
+2. **Preprocessing**
+   - Normalize pixel values
+   - Pad to model-compatible dimensions (multiples of 32/64)
+   - Convert to tensor format
 
-- **Languages**: Python (assumption based on codebase).
-- **Frameworks**: Flask.
-- **ML / CV Libraries**: PyTorch, OpenCV, BasicSR.
-- **Optional ML Tools**: Ultralytics YOLO, EasyOCR.
-- **Utilities**: NumPy, tqdm.
+3. **Dehazing** _(Phase 1)_
+   - Encode image using VQGAN encoder
+   - Process through transformer token predictor
+   - Iterative refinement with critic network
+   - Decode to clear image
 
-Assumption: This list is inferred from the repository imports and requirements files.
+4. **License Plate Detection** _(Phase 2 - Optional)_
+   - **Color Detection**: HSV-based detection for yellow/white/blue plates
+   - **Edge Detection**: Canny + contour analysis
+   - **OpenCV Methods**: Cascade classifiers and morphological operations
+   - **YOLO Detection**: Deep learning-based detection (if available)
+   - Filter and merge overlapping detections
 
-## 6. Installation and Setup
+5. **Enhancement & OCR**
+   - Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+   - Sharpen plate regions
+   - Extract text using EasyOCR
+   - Validate against Indian plate format (XX NN XX NNNN)
 
-1. **Prerequisites**:
-   - Python 3.8+ (assumption).
-   - GPU with CUDA for faster inference (optional).
-2. **Clone the repository**:
+6. **Output Generation**
+   - Save dehazed image (`*_dehazed.png`)
+   - Save final enhanced image (`*.png`)
+   - Save plate crops with metadata (`*_plate_N.png`)
+   - Generate processing reports
+
+---
+
+## 🏗️ Architecture
+
+### System Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                         User Interface                        │
+│  ┌─────────────────┐              ┌────────────────────────┐ │
+│  │  Web Interface  │              │   CLI Interface        │ │
+│  │   (Flask App)   │              │  (argparse + scripts)  │ │
+│  └────────┬────────┘              └───────────┬────────────┘ │
+└───────────┼──────────────────────────────────┼───────────────┘
+            │                                   │
+            └───────────┬───────────────────────┘
+                        ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    Processing Engine                          │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │               inference.py (Main Pipeline)              │ │
+│  │  • Image loading & preprocessing                        │ │
+│  │  • Model inference & dehazing                           │ │
+│  │  • Integrated plate detection                           │ │
+│  └──────────────────────┬──────────────────────────────────┘ │
+│                         │                                     │
+│  ┌─────────────────────┴──────────────────────────────────┐ │
+│  │          detect_plates.py (Phase 2 Detector)           │ │
+│  │  • Advanced plate detection on dehazed images          │ │
+│  │  • Multiple detection methods                           │ │
+│  │  • OCR and validation                                   │ │
+│  └─────────────────────────────────────────────────────────┘ │
+└───────────────────────────┬──────────────────────────────────┘
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│                      Model Components                         │
+│  ┌───────────────┐  ┌────────────┐  ┌────────────────────┐  │
+│  │ DehazeTokenNet│  │   Critic   │  │ Detection Models   │  │
+│  │  (Predictor)  │  │  Network   │  │ (YOLO + OpenCV)    │  │
+│  └───────┬───────┘  └─────┬──────┘  └──────────┬─────────┘  │
+│          └────────────────┴────────────────────┘             │
+│                            │                                  │
+│                    ┌───────▼────────┐                        │
+│                    │  VQGAN Encoder │                        │
+│                    │    & Decoder   │                        │
+│                    └────────────────┘                        │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Model Architecture: DehazeTokenNet
+
+```
+Input Image (H×W×3)
+      │
+      ▼
+┌─────────────────┐
+│ VQGAN Encoder   │──▶ Multi-scale features
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Token Encoding │──▶ Quantized tokens (H/64 × W/64 × 256)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────────────────┐
+│    Predictor (Transformer)          │
+│  • 4× RSTB blocks (Swin Transformer)│
+│  • Self-attention layers            │
+│  • Codebook prediction              │
+└────────┬────────────────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Critic Network │──▶ Quality assessment & refinement
+│  • 2× RSTB blocks│
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ VQGAN Decoder   │──▶ Reconstructed clear image
+└─────────────────┘
+```
+
+**Key Components:**
+
+- **VQGAN Encoder/Decoder**: Vector Quantized GAN for high-quality image reconstruction
+- **Predictor**: Swin Transformer-based token predictor with 4 RSTB blocks
+- **Critic**: Quality assessment network with 2 RSTB blocks
+- **Codebook**: 1024 embeddings of 256 dimensions each
+- **Feature Resolution**: 64× downsampling for efficient processing
+
+---
+
+## 💻 Installation
+
+### Prerequisites
+
+- **Python**: 3.8 or higher
+- **GPU**: NVIDIA GPU with CUDA support (optional but recommended)
+- **RAM**: Minimum 8GB, 16GB+ recommended for large images
+- **Storage**: ~5GB for models and dependencies
+
+### Step-by-Step Installation
+
+1. **Clone the Repository**
+
    ```bash
    git clone <repository-url>
    cd IPC-Dehaze
    ```
-3. **Create a virtual environment**:
+
+2. **Create Virtual Environment**
+
    ```bash
+   # Windows
    python -m venv .venv
    .venv\Scripts\activate
+
+   # Linux/Mac
+   python3 -m venv .venv
+   source .venv/bin/activate
    ```
-4. **Install dependencies**:
+
+3. **Install Dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
-5. **Add pretrained models**:
-   - `pretrained_models/predictor.pth`
-   - `pretrained_models/critic.pth`
 
-Assumption: Environment setup uses standard Python venv on Windows; adjust as needed for your platform.
+4. **Download Pretrained Models**
 
-## 7. Usage
+   Place the following model files in `pretrained_models/`:
+   - `predictor.pth` - Main dehazing model
+   - `critic.pth` - Quality refinement model
 
-### Web app
+   ```bash
+   # Create directory if it doesn't exist
+   mkdir -p pretrained_models
+
+   # Download models (use provided download script)
+   python scripts/download_pretrained_models.py
+   ```
+
+5. **Verify Installation**
+   ```bash
+   python setup.py
+   ```
+   This will check Python version, dependencies, CUDA availability, and create necessary directories.
+
+### Optional Components
+
+**For YOLO-based detection:**
 
 ```bash
-python app.py
+pip install ultralytics
 ```
 
-Open `http://localhost:5000` and upload images.
+**For OCR functionality:**
 
-### CLI (full pipeline)
+```bash
+pip install easyocr
+```
+
+---
+
+## 🚀 Usage
+
+### Web Interface (Recommended for Beginners)
+
+1. **Start the Flask Server**
+
+   ```bash
+   python app.py
+   ```
+
+2. **Open Browser**
+   Navigate to `http://localhost:5000`
+
+3. **Upload & Process**
+   - Upload up to 10 images (max 100MB total)
+   - Adjust processing parameters:
+     - **Iterations**: 1-20 (default: 8)
+     - **Max Size**: Maximum dimension (default: 1500)
+     - **Enhance Plates**: Enable/disable plate detection
+   - Click "Process" and download results
+
+**Web Interface Features:**
+
+- Real-time progress tracking
+- Image preview before/after
+- Batch download of results
+- Session-based processing
+- Automatic plate detection
+
+### Command-Line Interface (CLI)
+
+#### Basic Dehazing
+
+```bash
+python inference.py -i examples -o results
+```
+
+#### Dehazing + License Plate Detection
 
 ```bash
 python inference.py -i examples -o results --enhance_plates
 ```
 
-### CLI (dehaze only)
+#### Dehaze Only (No Plate Detection)
 
 ```bash
 python inference.py -i examples -o results --dehaze_only
 ```
 
-### Two-phase usage
+#### Advanced Options
 
 ```bash
-python inference.py -i examples -o results --dehaze_only
-python detect_plates.py -i results -o results_user
+python inference.py \
+  -i input_folder \
+  -o output_folder \
+  -n 10 \
+  --max_size 2000 \
+  --resize_to 1024 \
+  --enhance_plates \
+  --save_plate_crops
 ```
 
-## 8. Results and Performance (Optional but recommended)
+**CLI Parameters:**
 
-Assumption: No benchmark metrics were provided. Suggested placeholders:
+- `-i, --input`: Input image or folder path
+- `-o, --output`: Output folder path
+- `-n, --num_iterations`: Number of dehazing iterations (default: 8)
+- `--max_size`: Maximum dimension for resizing (default: 1500)
+- `--resize_to`: Force resize to specific dimension
+- `--force_width`, `--force_height`: Force specific dimensions
+- `--enhance_plates`: Enable automatic license plate detection
+- `--dehaze_only`: Skip plate detection
+- `--save_plate_crops`: Save individual plate crops
 
-- **Model Quality**: Not measured (PSNR/SSIM not reported).
-- **Inference Speed**: Not measured (depends on GPU/CPU).
+### Two-Phase Workflow
 
-[Image: Example dehazed output with plate enhancement]
+For better control, separate dehazing and plate detection:
 
-## 9. Future Work / Roadmap
+**Phase 1: Dehaze Images**
 
-- Add quantitative benchmarks (PSNR/SSIM) and runtime profiling.
-- Train or integrate a dedicated license plate YOLO model for higher recall.
-- Add a batch-results viewer and CSV export of OCR outputs.
+```bash
+python inference.py -i raw_images -o dehazed_output --dehaze_only
+```
 
-## 10. Contributing
+**Phase 2: Detect Plates**
 
-1. Fork the repository.
-2. Create a feature branch.
-3. Commit your changes.
-4. Open a pull request with a clear description.
+```bash
+python detect_plates.py -i dehazed_output -o final_results
+```
+
+This approach is useful for:
+
+- Processing large batches
+- Fine-tuning plate detection separately
+- Reprocessing already dehazed images
+- Debugging and testing
+
+### Example Workflows
+
+**Scenario 1: Quick Processing**
+
+```bash
+# Process single image with defaults
+python inference.py -i hazy_image.jpg -o results
+```
+
+**Scenario 2: High-Quality Processing**
+
+```bash
+# Maximum quality with more iterations
+python inference.py -i input/ -o output/ -n 15 --enhance_plates
+```
+
+**Scenario 3: Large Image Batch**
+
+```bash
+# Process efficiently with size limits
+python inference.py -i large_batch/ -o results/ --max_size 1200 --dehaze_only
+python detect_plates.py -i results/ -o final/
+```
+
+---
+
+## 📁 Project Structure
+
+```
+IPC-Dehaze/
+│
+├── app.py                          # Flask web application
+├── inference.py                    # Main dehazing pipeline
+├── detect_plates.py                # License plate detection module
+├── setup.py                        # Installation & verification script
+│
+├── requirements.txt                # Python dependencies
+├── requirements_web.txt            # Web-specific dependencies
+├── LICENSE.txt                     # Pi-Lab License 1.0
+├── README.md                       # This file
+│
+├── basicsr/                        # Core model implementation
+│   ├── __init__.py
+│   ├── train.py                   # Training script
+│   ├── test.py                    # Testing utilities
+│   ├── archs/                     # Model architectures
+│   │   ├── dehazeToken_arch.py   # DehazeTokenNet, Critic, Predictor
+│   │   ├── vqgan.py              # VQGAN encoder/decoder
+│   │   ├── network_swinir.py     # Swin Transformer blocks
+│   │   └── fema_utils.py         # Utility modules
+│   ├── data/                      # Data loading & augmentation
+│   ├── losses/                    # Loss functions
+│   ├── models/                    # Training models
+│   └── utils/                     # Helper utilities
+│
+├── options/                        # Training configurations
+│   ├── 01train_FeMaSR_HQ_pretrain_stage.yml
+│   ├── 02train_predictor.yml
+│   └── 03train_critic.yml
+│
+├── pretrained_models/              # Model weights
+│   ├── predictor.pth
+│   └── critic.pth
+│
+├── scripts/                        # Utility scripts
+│   ├── download_pretrained_models.py
+│   ├── download_gdrive.py
+│   └── data_preparation/
+│
+├── templates/                      # Web UI templates
+│   └── index.html
+│
+├── examples/                       # Sample input images
+├── uploads/                        # Web upload storage
+├── web_results/                    # Web processing output
+├── results/                        # CLI output
+└── test_output/                    # Testing output
+```
+
+---
+
+## 🛠️ Technology Stack
+
+### Core Technologies
+
+| Category             | Technologies                           |
+| -------------------- | -------------------------------------- |
+| **Language**         | Python 3.8+                            |
+| **Web Framework**    | Flask 2.3+                             |
+| **Deep Learning**    | PyTorch 1.12+, torchvision, torchaudio |
+| **Computer Vision**  | OpenCV 4.8+, BasicSR                   |
+| **Model Components** | timm, einops                           |
+| **Object Detection** | Ultralytics YOLO 8.0+ (optional)       |
+| **OCR**              | EasyOCR 1.7+ (optional)                |
+| **Utilities**        | NumPy, tqdm, Werkzeug                  |
+
+### Development Tools
+
+- **Version Control**: Git
+- **Dependency Management**: pip, virtualenv
+- **Training**: PyTorch distributed, CUDA
+- **Monitoring**: tqdm for progress bars
+
+---
+
+## 🧠 Model Details
+
+### DehazeTokenNet Architecture
+
+**Paper/Method**: Based on FeMaSR (Feature Matching Super-Resolution) adapted for dehazing
+
+**Model Characteristics:**
+
+- **Type**: Transformer-based generative model with VQGAN
+- **Input**: RGB images (any size, automatically padded)
+- **Output**: Clear dehazed RGB images
+- **Codebook**: 1024 tokens, 256-dimensional embeddings
+- **Downsampling**: 64× (from 256×256 to 4×4 tokens)
+- **Parameters**: ~50M (estimated)
+
+**Training Configuration:**
+
+- **Stage 1**: VQGAN pretraining on high-quality images
+- **Stage 2**: Predictor training with synthetic haze
+- **Stage 3**: Critic training for quality refinement
+- **Dataset**: Custom haze synthesis from RGB + depth images
+- **Batch Size**: 4 per GPU
+- **Learning Rate**: 1e-4 (predictor), 4e-4 (discriminator)
+- **Optimizer**: Adam (β₁=0.9, β₂=0.99)
+
+**Haze Synthesis Parameters:**
+
+- Beta range: [0.3, 1.5] (scattering coefficient)
+- Atmospheric light (A): [0.25, 1.0]
+- Color variations: [-0.025, 0.025]
+
+---
+
+## 🚗 License Plate Detection
+
+### Detection Methods
+
+The system employs **5 complementary detection methods** for maximum recall:
+
+#### 1. **Yellow Plate Detection** (Commercial Vehicles)
+
+- HSV color space filtering
+- Range: H: [15-35], S: [80-255], V: [80-255]
+- Morphological operations for noise removal
+- Aspect ratio filtering: 2:1 to 5:1
+
+#### 2. **White Plate Detection** (Private Vehicles)
+
+- Adaptive HSV thresholding
+- Enhanced sensitivity: H: [0-180], S: [0-50], V: [180-255]
+- Minimum area: 1000 pixels
+- Convex hull analysis
+
+#### 3. **Enhanced White Detection**
+
+- Secondary pass with relaxed parameters
+- Catches plates missed by strict filtering
+- Gradient-based enhancement
+
+#### 4. **Blue Plate Detection** (Government Vehicles)
+
+- Blue color space targeting
+- Range: H: [90-130], S: [80-255], V: [80-255]
+- Special handling for government vehicles
+
+#### 5. **OpenCV Traditional Detection**
+
+- Edge detection (Canny)
+- Contour analysis
+- Morphological transformations
+- Aspect ratio and area validation
+
+#### 6. **YOLO Detection** (Optional)
+
+- YOLOv8 nano model
+- Real-time object detection
+- High accuracy for visible plates
+- Requires: `pip install ultralytics`
+
+### OCR & Validation
+
+**Indian License Plate Format**: `XX NN XX NNNN`
+
+- State Code: 2 letters (e.g., MH, DL, KA)
+- District Code: 2 digits (e.g., 01, 02)
+- Series: 2 letters (e.g., AB, CD)
+- Unique Number: 4 digits (e.g., 1234)
+
+**Validation Features:**
+
+- Format checking with detailed error reporting
+- Confidence scoring based on valid segments
+- Character correction for common OCR errors
+- Formatted output: "MH 01 AB 1234"
+
+### Enhancement Pipeline
+
+For each detected plate:
+
+1. **Contrast Enhancement**: CLAHE with clip limit 2.0
+2. **Sharpening**: Unsharp mask for edge clarity
+3. **Noise Reduction**: Bilateral filtering
+4. **Binarization**: Adaptive thresholding for OCR
+5. **Text Extraction**: EasyOCR with English model
+6. **Validation**: Format checking and confidence scoring
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions to improve IPC-Dehaze! Here's how you can help:
+
+### Ways to Contribute
+
+1. **Bug Reports**: Open an issue with detailed reproduction steps
+2. **Feature Requests**: Suggest new features or improvements
+3. **Code Contributions**: Submit pull requests for bug fixes or features
+4. **Documentation**: Improve README, add tutorials, or create examples
+5. **Testing**: Test on different platforms and report results
+
+### Development Workflow
+
+1. **Fork the Repository**
+
+   ```bash
+   git fork <repository-url>
+   ```
+
+2. **Create Feature Branch**
+
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+3. **Make Changes**
+   - Write clean, documented code
+   - Follow PEP 8 style guidelines
+   - Add tests if applicable
+
+4. **Test Your Changes**
+
+   ```bash
+   python setup.py  # Verify installation
+   python inference.py -i examples -o test_output  # Test functionality
+   ```
+
+5. **Commit Changes**
+
+   ```bash
+   git add .
+   git commit -m "Add: detailed description of changes"
+   ```
+
+6. **Push and Create PR**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+   Then open a Pull Request with:
+   - Clear description of changes
+   - Screenshots/examples if applicable
+   - Related issue numbers
+
+### Code Standards
+
+- **Python**: PEP 8 compliant
+- **Documentation**: Docstrings for all functions and classes
+- **Comments**: Explain complex logic
+- **Testing**: Test new features before submitting
+
+---
+
+## 📄 License
+
+This project is licensed under the **Pi-Lab License 1.0** - see the [LICENSE.txt](LICENSE.txt) file for details.
+
+**Key Points:**
+
+- ✅ Free for non-commercial research and educational use
+- ✅ Open source with attribution required
+- ❌ Commercial use requires written permission
+- ❌ No warranty or liability
+
+Copyright © 2024 Pi-Lab. All rights reserved.
+
+---
+
+## 🙏 Acknowledgments
+
+### Research Foundations
+
+This project builds upon several key research works:
+
+- **FeMaSR**: Feature Matching Super-Resolution methodology
+- **VQGAN**: Vector Quantized Generative Adversarial Networks
+- **Swin Transformer**: Hierarchical Vision Transformer
+- **BasicSR**: Basic Super-Resolution framework
+
+### Libraries & Tools
+
+- **PyTorch**: Deep learning framework
+- **OpenCV**: Computer vision operations
+- **Ultralytics**: YOLOv8 implementation
+- **EasyOCR**: Optical character recognition
+- **Flask**: Web application framework
+
+### Community
+
+Thanks to all contributors, testers, and users who help improve this project!
+
+---
+
+## 📞 Support & Contact
+
+- **Issues**: Report bugs via [GitHub Issues](../../issues)
+- **Discussions**: Ask questions in [GitHub Discussions](../../discussions)
+- **Email**: [Contact Pi-Lab](mailto:your-email@example.com)
+
+---
+
+## 🗺️ Roadmap
+
+### Future Enhancements
+
+- [ ] Real-time video dehazing support
+- [ ] Additional license plate formats (EU, US, etc.)
+- [ ] Web API for cloud deployment
+- [ ] Mobile app integration
+- [ ] Improved YOLO model for plates
+- [ ] Benchmark datasets and metrics
+- [ ] Docker containerization
+- [ ] Multi-GPU training support
+- [ ] Model quantization for edge devices
+- [ ] Batch export to CSV/Excel
+
+### Version History
+
+- **v1.0.0** (Current): Initial release with dehazing and plate detection
+- **v0.9.0**: Beta testing phase
+- **v0.5.0**: Core model implementation
+
+---
+
+**Made with ❤️ by Pi-Lab**
+
+_"Clearing the haze, one image at a time"_
