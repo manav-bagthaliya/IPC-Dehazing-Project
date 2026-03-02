@@ -173,4 +173,4 @@ data/
 # Configuration files with sensitive data
 config.ini
 secrets.json
-.secrets
+.secrets.venv/
