@@ -648,7 +648,7 @@ Thanks to all contributors, testers, and users who help improve this project!
 
 ## 📞 Support & Contact
 
-- **Email**: [](22it005@charusat.edu.in)
+- **Email**: [22it005@charusat.edu.in]
 
 ---
 
