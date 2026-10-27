@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPC-Dehaze - AI Image Dehazing Tool</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <!-- Welcome Modal -->
+    <div class="modal-overlay" id="welcomeModal">
+        <div class="welcome-modal">
+            <div class="welcome-icon">
+                <i class="fas fa-cloud-sun"></i>
+            </div>
+            <div class="welcome-title">Welcome to IPC-Dehaze!</div>
+            <div class="welcome-message">
+                Your AI-powered solution for removing fog, haze, and atmospheric distortion from images.
+            </div>
+            <div class="welcome-features">
+                <h4><i class="fas fa-star"></i> Key Features:</h4>
+                <ul class="feature-list">
+                    <li><i class="fas fa-check-circle"></i> Advanced AI dehazing technology</li>
+                    <li><i class="fas fa-check-circle"></i> Batch processing for multiple images</li>
+                    <li><i class="fas fa-check-circle"></i> Customizable processing parameters</li>
+                    <li><i class="fas fa-check-circle"></i> High-quality output results</li>
+                    <li><i class="fas fa-check-circle"></i> Easy drag & drop interface</li>
+                </ul>
+            </div>
+            <button class="modal-btn" onclick="closeWelcomeModal()">
+                <i class="fas fa-rocket"></i> Get Started
+            </button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-cloud-sun"></i> IPC-Dehaze</h1>
+            <p>AI-Powered Image Dehazing Tool - Remove Fog, Haze & Atmospheric Distortion</p>
+        </div>
+
+        <div class="main-card">
+            <div class="card-header">
+                <h2><i class="fas fa-upload"></i> Upload Images</h2>
+                <p>Select multiple foggy images to process (Max: 10 images, 100MB total)</p>
+            </div>
+            <div class="card-body">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <div class="upload-text">Drag & Drop images here or click to browse</div>
+                    <div class="upload-hint">Supports: PNG, JPG, JPEG, BMP, TIFF</div>
+                    <input type="file" class="file-input" id="fileInput" multiple accept="image/*">
+                </div>
+
+                <div class="uploaded-files" id="uploadedFiles" style="display: none;">
+                    <h3><i class="fas fa-images"></i> Uploaded Images</h3>
+                    <p style="color: #6b7280; margin-bottom: 15px; font-size: 0.9rem;">
+                        <i class="fas fa-magic"></i> License plates will be automatically detected and enhanced
+                    </p>
+                    <div class="file-grid" id="fileGrid"></div>
+                </div>
+
+                <div class="auto-detection-info" id="autoDetectionInfo" style="display: none;">
+                    <div class="info-card">
+                        <div class="info-icon">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="info-content">
+                            <h4><i class="fas fa-brain"></i> Automatic License Plate Detection</h4>
+                            <p>Our AI will automatically detect and enhance license plates including:</p>
+                            <ul class="detection-features">
+                                <li><i class="fas fa-star"></i> <strong>Yellow license plates</strong> (commercial
+                                    vehicles) - Primary focus</li>
+                                <li><i class="fas fa-star"></i> <strong>White license plates</strong> (private vehicles)
+                                    - High priority</li>
+                                <li><i class="fas fa-check-circle"></i> Blue license plates (government vehicles)</li>
+                                <li><i class="fas fa-check-circle"></i> Other colored plates using advanced detection
+                                </li>
+                            </ul>
+                            <div class="detection-status">
+                                <span class="status-text">Ready for automatic processing</span>
+                                <span class="status-icon">🤖</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="processing-options" id="processingOptions" style="display: none;">
+                    <h3><i class="fas fa-cogs"></i> Processing Options</h3>
+                    <div class="options-grid">
+                        <div class="option-group">
+                            <label class="option-label">Number of Iterations</label>
+                            <input type="number" class="option-input" id="numIterations" value="8" min="1" max="20">
+                            <div class="option-hint">Higher = better quality, slower processing</div>
+                        </div>
+                        <div class="option-group">
+                            <label class="option-label">Max Size (pixels)</label>
+                            <input type="number" class="option-input" id="maxSize" value="1500" min="512" max="3000">
+                            <div class="option-hint">Larger images will be scaled down</div>
+                        </div>
+                        <div class="option-group">
+                            <label class="option-label">Resize Long Edge To</label>
+                            <input type="number" class="option-input" id="resizeTo" value="0" min="0" max="3000">
+                            <div class="option-hint">0 = no resize, >0 = upscale small images</div>
+                        </div>
+                        <div class="option-group">
+                            <label class="option-label">Force Width (pixels)</label>
+                            <input type="number" class="option-input" id="forceWidth" value="0" min="0" max="3000">
+                            <div class="option-hint">0 = auto, >0 = force specific width</div>
+                        </div>
+                        <div class="option-group">
+                            <label class="option-label">Force Height (pixels)</label>
+                            <input type="number" class="option-input" id="forceHeight" value="0" min="0" max="3000">
+                            <div class="option-hint">0 = auto, >0 = force specific height</div>
+                        </div>
+                        <div class="option-group">
+                            <label class="option-label">
+                                <input type="checkbox" id="enhancePlates" class="option-checkbox" checked disabled>
+                                <span class="checkbox-label">Automatic License Plate Enhancement</span>
+                            </label>
+                            <div class="option-hint">Always enabled - AI automatically detects and enhances license
+                                plates</div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-primary" id="processBtn">
+                            <i class="fas fa-magic"></i> Process Images (Clear Fog + Detect Plates)
+                        </button>
+                        <button class="btn btn-secondary" id="clearBtn">
+                            <i class="fas fa-trash"></i> Clear All
+                        </button>
+                    </div>
+                </div>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <h3>Processing Images...</h3>
+                    <p>This may take a few minutes depending on image size and settings</p>
+                    <div class="progress-bar" id="progressBar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+
+                <div class="alert" id="alert"></div>
+            </div>
+        </div>
+
+        <div class="main-card" id="resultsCard" style="display: none;">
+            <div class="card-header">
+                <h2><i class="fas fa-check-circle"></i> Processing Results</h2>
+                <p>Your dehazed images are ready for download</p>
+            </div>
+            <div class="card-body">
+                <div class="stats-bar" id="statsBar">
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-number" id="totalImages">0</div>
+                            <div class="stat-label">Total Images</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" id="processedImages">0</div>
+                            <div class="stat-label">Processed</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" id="totalSize">0</div>
+                            <div class="stat-label">Total Size (MB)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="results-section">
+                    <h3><i class="fas fa-images"></i> Processing Results</h3>
+                    <div class="auto-results" id="autoResults">
+                        <div class="result-section">
+                            <h4><i class="fas fa-broom"></i> Clear Images (Fog Removed)</h4>
+                            <div id="dehazedResults">
+                                <p>Clear dehazed images will appear here</p>
+                            </div>
+                        </div>
+                        <div class="result-section">
+                            <h4><i class="fas fa-magic"></i> Enhanced License Plates</h4>
+                            <div id="processedResults">
+                                <p>Images with detected and enhanced license plates will appear here</p>
+                            </div>
+                        </div>
+                        <div class="result-section">
+                            <h4><i class="fas fa-search-plus"></i> Plate Crops (Zoomed)</h4>
+                            <div id="plateCrops">
+                                <p>Zoomed plate crops will appear here</p>
+                            </div>
+                        </div>
+                        <div class="detection-info-section">
+                            <h4><i class="fas fa-robot"></i> Detection Information</h4>
+                            <div id="detectionInfo">
+                                <p>License plate detection details will appear here</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="downloadAllBtn">
+                        <i class="fas fa-download"></i> Download All
+                    </button>
+                    <button class="btn btn-secondary" id="newSessionBtn">
+                        <i class="fas fa-plus"></i> New Session
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Fullscreen Image Modal -->
+    <div class="image-modal-overlay" id="imageModal" onclick="app.closeImageModal()">
+        <div class="image-modal-content">
+            <img id="imageModalImg" src="" alt="Preview">
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+
+</html>

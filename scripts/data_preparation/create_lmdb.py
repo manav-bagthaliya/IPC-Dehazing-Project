@@ -1,4 +1,3 @@
-import argparse
 from os import path as osp
 
 from basicsr.utils import scandir

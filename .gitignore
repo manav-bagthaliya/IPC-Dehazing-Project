@@ -118,14 +118,12 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Project specific
-uploads/
-web_results/
-results/
-results_user/
-results_user_fast/
-results_resized/
-test_results/
+# Runtime outputs
+/uploads/
+/web_results/
+/results/
+/test_output/
+/test_results/
 *.pth
 *.pt
 *.ckpt
@@ -159,18 +157,23 @@ Thumbs.db
 *.log
 logs/
 
-# Model checkpoints and weights
-experiments/
-checkpoints/
-models/
+# Model checkpoints and weights (anchored to the root so basicsr/models/ is not ignored)
+/experiments/
+/checkpoints/
+/models/
 pretrained_models/*.pth
 pretrained_models/*.pt
+!pretrained_models/yolov8n.pt
 
-# Data directories
-datasets/
-data/
+# Data directories (anchored so basicsr/data/ and tests/data/ are not ignored)
+/datasets/
+/data/
+
+# Virtual environments
+myenv/
 
 # Configuration files with sensitive data
 config.ini
 secrets.json
-.secrets.venv/
+.secrets
+

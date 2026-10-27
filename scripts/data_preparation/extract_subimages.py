@@ -45,8 +45,8 @@ def main():
 
     # opt['input_folder'] = '../../../datasets/SR_OST_datasets/OutdoorSceneTrain_v2/'
     # opt['save_folder'] = '../../../datasets/HQ_sub/OST_train_HR_sub/'
-    # opt['crop_size'] = 320 
-    # opt['step'] = 160 
+    # opt['crop_size'] = 320
+    # opt['step'] = 160
     # opt['thresh_size'] = 0
 
     # HR images

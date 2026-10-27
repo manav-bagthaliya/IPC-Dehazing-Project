@@ -15,7 +15,7 @@
 - [Architecture](#architecture)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Project Structure](#project-structure)
+- [Project Structure](#-project-structure)
 - [Technology Stack](#technology-stack)
 - [Model Details](#model-details)
 - [License Plate Detection](#license-plate-detection)
@@ -261,18 +261,21 @@ Input Image
    - `critic.pth` - Quality refinement model
 
    ```bash
-   # Create directory if it doesn't exist
-   mkdir -p pretrained_models
-
-   # Download models (use provided download script)
-   python scripts/download_pretrained_models.py
+   python scripts/download_weights.py
    ```
+
+   (Or download manually from the [official Google Drive folder](https://drive.google.com/drive/folders/1i5DS0jjTlm1nSXSAPd4Qp5_7dLSva_1E).)
 
 5. **Verify Installation**
    ```bash
-   python setup.py
+   python scripts/check_env.py
    ```
-   This will check Python version, dependencies, CUDA availability, and create necessary directories.
+   This checks the Python version, packages, CPU/GPU device and model files.
+
+6. **Run the Tests**
+   ```bash
+   python -m pytest tests -q
+   ```
 
 ### Optional Components
 
@@ -294,10 +297,11 @@ pip install easyocr
 
 ### Web Interface (Recommended for Beginners)
 
-1. **Start the Flask Server**
+1. **Start the Flask Server** (from the project root)
 
    ```bash
-   python app.py
+   python web/app.py
+   # optional: FLASK_DEBUG=1 PORT=8000 python web/app.py
    ```
 
 2. **Open Browser**
@@ -410,6 +414,48 @@ python inference.py -i input/ -o output/ -n 15 --enhance_plates
 python inference.py -i large_batch/ -o results/ --max_size 1200 --dehaze_only
 python detect_plates.py -i results/ -o final/
 ```
+
+## 📁 Project Structure
+
+```
+IPC-Dehazing-Project/
+├── inference.py              # CLI - Phase 1: dehaze (+ optional plate detection)
+├── detect_plates.py          # CLI - Phase 2: plate detection on dehazed images
+├── ipc_dehaze/               # Application code (our pipeline)
+│   ├── config.py             #   paths & defaults (model paths, iterations, max size)
+│   ├── dehaze.py             #   Dehazer: loads Predictor + Critic once, dehazes images
+│   ├── enhance.py            #   OpenCV post-processing (CLAHE, sharpen, binarize)
+│   └── plates/
+│       ├── detection.py      #   colour / edge / contour / YOLO plate detectors
+│       ├── ocr.py            #   EasyOCR + Indian plate format validation
+│       └── pipeline.py       #   detect -> enhance -> OCR -> validate
+├── web/                      # Flask web interface
+│   ├── app.py
+│   ├── templates/index.html
+│   └── static/{css,js}/
+├── basicsr/                  # Model architectures + training framework (from the paper)
+│   ├── archs/                #   DehazeTokenNet, Critic, VQGAN, SwinIR blocks, discriminator
+│   ├── models/               #   training logic for VQGAN / Predictor / Critic
+│   ├── data/                 #   datasets incl. online haze synthesis
+│   ├── losses/
+│   └── utils/                #   incl. parallel_decode.py (iterative critic decoding)
+├── options/                  # Training configs (Stage 1 VQGAN, Stage 2 Predictor, Stage 3 Critic)
+├── scripts/
+│   ├── train/                #   train_vqgan.sh, train_predictor.sh, train_critic.sh
+│   ├── data_preparation/     #   create_lmdb.py, extract_subimages.py
+│   ├── download_weights.py   #   fetch predictor.pth / critic.pth
+│   ├── check_env.py          #   environment check
+│   └── evaluate_iqa.py       #   PSNR / SSIM / NIQE / LPIPS ... via pyiqa
+├── pretrained_models/        # Weights (not in git) + yolov8n.pt
+├── tests/                    # pytest suite + tests/data sample images
+├── examples/                 # Sample hazy inputs
+├── docs/                     # Paper figures and sample results
+└── requirements.txt
+```
+
+Runtime folders `uploads/`, `web_results/` and `results/` are created automatically and are git-ignored.
+
+---
 
 ## 🛠️ Technology Stack
 
@@ -577,8 +623,8 @@ We welcome contributions to improve IPC-Dehaze! Here's how you can help:
 4. **Test Your Changes**
 
    ```bash
-   python setup.py  # Verify installation
-   python inference.py -i examples -o test_output  # Test functionality
+   python scripts/check_env.py   # Verify installation
+   python -m pytest tests -q      # Run tests
    ```
 
 5. **Commit Changes**
@@ -625,7 +671,10 @@ Copyright © 2024 Pi-Lab. All rights reserved.
 
 ### Research Foundations
 
-This project builds upon several key research works:
+The dehazing model and training code come from the official implementation of
+**[Iterative Predictor-Critic Code Decoding for Real-World Image Dehazing](https://arxiv.org/abs/2503.13147)**
+(Jiayi Fu et al., CVPR 2025 - [code](https://github.com/Jiayi-Fu/IPC-Dehaze)). This project adds the
+licence plate pipeline, web interface and tooling on top. It also builds on:
 
 - **FeMaSR**: Feature Matching Super-Resolution methodology
 - **VQGAN**: Vector Quantized Generative Adversarial Networks

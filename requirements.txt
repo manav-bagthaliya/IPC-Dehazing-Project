@@ -1,13 +1,32 @@
+# Deep learning
 torch>=1.12.1
-torchaudio
 torchvision
-tqdm
-opencv-python>=4.8.0
-pyiqa
+torchaudio
 timm
+einops
+pyiqa                  # image-quality metrics + LPIPS loss used in training
+
+# Image processing
+opencv-python>=4.8.0
+numpy>=1.21.0
+scipy
+scikit-image
+matplotlib
+tqdm
+
+# Training framework (basicsr/)
+pyyaml
+lmdb
+requests
+
+# Licence plate detection / OCR
 ultralytics>=8.0.0
 easyocr>=1.7.0
-numpy>=1.21.0
+
+# Web app
 flask>=2.3.0
 werkzeug>=2.3.0
-einops
+
+# Utilities
+gdown                  # scripts/download_weights.py
+pytest                 # tests/
