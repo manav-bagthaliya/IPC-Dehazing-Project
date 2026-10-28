@@ -708,3 +708,18 @@ Thanks to all contributors, testers, and users who help improve this project!
 - **v0.5.0**: Core model implementation
 
 _"Clearing the haze, one image at a time"_
+
+
+
+
+
+# commands to apply after the installing the requirements.txt file in the project with the activated virtual environment ! 
+
+
+python scripts/download_weights.py
+python scripts/check_env.py
+
+
+python inference.py -i examples -o results --enhance_plates
+
+python web/app.py
