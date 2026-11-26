@@ -26,6 +26,10 @@ easyocr>=1.7.0
 # Web app
 flask>=2.3.0
 werkzeug>=2.3.0
+authlib>=1.3.0         # Google sign-in (OpenID Connect)
+python-dotenv>=1.0.0   # reads .env
+waitress>=3.0.0        # production web server (used automatically when installed)
+pillow                 # cheap image-header checks on upload
 
 # Utilities
 gdown                  # scripts/download_weights.py

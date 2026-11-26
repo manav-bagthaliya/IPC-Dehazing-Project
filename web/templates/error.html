@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>{{ code }} · IPC-Dehaze</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="login-page">
+    <main class="login-card">
+        <div class="error-code">{{ code }}</div>
+        <h1>{{ message }}</h1>
+        <p class="login-lead">That page is not available.</p>
+        <a class="btn btn--primary" href="/">Back to IPC-Dehaze</a>
+    </main>
+</body>
+</html>

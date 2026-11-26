@@ -66,14 +66,23 @@ def process_plates(image, enhancer=enhance_plate_region, only_valid=True):
     return output, plates
 
 
-def emit_plate_json(plate):
-    """Print one machine-readable line; the web app parses lines starting with PLATE_JSON:."""
-    summary = {
-        'formatted_text': plate['formatted_text'],
+def summarize_plate(plate):
+    """JSON-safe description of one detected plate (numpy ints/floats become plain Python)."""
+    return {
+        'text': plate.get('text', ''),
+        'formatted_text': plate.get('formatted_text', ''),
+        'valid': bool(plate.get('valid', False)),
         'confidence': float(plate['confidence']),
         'segments': plate.get('segments', {}),
         'bbox': [int(v) for v in plate['bbox']],
         'method': plate.get('method', 'unknown'),
-        'color': plate.get('color', 'unknown')
+        'color': plate.get('color', 'unknown'),
     }
+
+
+def emit_plate_json(plate):
+    """Print one machine-readable line (``PLATE_JSON:{...}``) for scripts that parse CLI output."""
+    summary = summarize_plate(plate)
+    summary.pop('text')
+    summary.pop('valid')
     print('PLATE_JSON:' + json.dumps(summary, ensure_ascii=False))

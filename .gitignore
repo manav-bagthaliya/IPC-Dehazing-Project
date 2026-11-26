@@ -181,3 +181,6 @@ secrets.json
 # local benchmark datasets and reports
 /benchmarks/plates_test/
 /benchmarks/*.json
+
+# web app: per-user uploads and results
+/web_data/

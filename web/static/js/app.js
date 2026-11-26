@@ -1,662 +1,488 @@
-class IPCDehazeApp {
-    constructor() {
-        this.uploadedFiles = [];
-        this.actualUploadedFiles = []; // Store actual File objects
-        this.sessionId = null;
-        this.init();
-    }
+/* IPC-Dehaze front end. Plain JavaScript, no dependencies. User-supplied text is only ever set via textContent. */
+(() => {
+    'use strict';
 
-    init() {
-        this.bindEvents();
-        this.checkSession();
-    }
+    const $ = (sel, root = document) => root.querySelector(sel);
+    const CFG = {
+        csrf: document.body.dataset.csrf,
+        maxImages: Number(document.body.dataset.maxImages) || 10,
+        maxMb: Number(document.body.dataset.maxMb) || 100,
+    };
+    const PRESETS = {
+        fast: { iterations: 4, max_size: 1024 },
+        balanced: { iterations: 8, max_size: 1500 },
+        best: { iterations: 12, max_size: 1500 },
+    };
+    const IMAGE_RE = /\.(png|jpe?g|bmp|tiff?|webp)$/i;
+    const SETTINGS_KEY = 'ipc-settings';
+    const LAST_JOB_KEY = 'ipc-last-job';
 
-    bindEvents() {
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
+    let files = [];            // [{ id, file, url }]
+    let job = null;            // latest job JSON from the server
+    let busy = false;          // uploading or processing
+    let pollTimer = null;
+    const cardCache = new Map(); // item id -> { sig, el }
 
-        uploadArea.addEventListener('click', () => fileInput.click());
-        uploadArea.addEventListener('dragover', this.handleDragOver.bind(this));
-        uploadArea.addEventListener('dragleave', this.handleDragLeave.bind(this));
-        uploadArea.addEventListener('drop', this.handleDrop.bind(this));
-        fileInput.addEventListener('change', this.handleFileSelect.bind(this));
-
-        document.getElementById('processBtn').addEventListener('click', this.processImages.bind(this));
-        document.getElementById('clearBtn').addEventListener('click', this.clearAll.bind(this));
-        document.getElementById('downloadAllBtn').addEventListener('click', this.downloadAll.bind(this));
-        document.getElementById('newSessionBtn').addEventListener('click', this.newSession.bind(this));
-
-    }
-
-    handleDragOver(e) {
-        e.preventDefault();
-        e.currentTarget.classList.add('dragover');
-    }
-
-    handleDragLeave(e) {
-        e.currentTarget.classList.remove('dragover');
-    }
-
-    handleDrop(e) {
-        e.preventDefault();
-        e.currentTarget.classList.remove('dragover');
-        const files = Array.from(e.dataTransfer.files);
-        this.processFiles(files);
-    }
-
-    handleFileSelect(e) {
-        const files = Array.from(e.target.files);
-        this.processFiles(files);
-    }
-
-    async processFiles(files) {
-        const imageFiles = files.filter(file => file.type.startsWith('image/'));
-
-        if (imageFiles.length === 0) {
-            this.showAlert('Please select valid image files', 'error');
-            return;
+    // ---------------------------------------------------------------- helpers
+    function h(tag, props = {}, ...children) {
+        const el = document.createElement(tag);
+        for (const [key, value] of Object.entries(props)) {
+            if (value == null || value === false) continue;
+            if (key === 'class') el.className = value;
+            else if (key === 'text') el.textContent = value;
+            else if (key.startsWith('on')) el.addEventListener(key.slice(2), value);
+            else el.setAttribute(key, value === true ? '' : value);
         }
-
-        if (imageFiles.length > 10) {
-            this.showAlert('Maximum 10 images allowed', 'error');
-            return;
+        for (const child of children.flat()) {
+            if (child == null || child === false) continue;
+            el.append(child.nodeType ? child : document.createTextNode(child));
         }
+        return el;
+    }
+    const icon = (name) => {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'icon');
+        const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+        use.setAttribute('href', '#i-' + name);
+        svg.append(use);
+        return svg;
+    };
+    const store = {
+        get(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } },
+        set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage may be blocked */ } },
+        del(key) { try { localStorage.removeItem(key); } catch { /* ignore */ } },
+    };
+    const fmtMB = (bytes) => (bytes / 1048576).toFixed(bytes < 1048576 * 10 ? 1 : 0) + ' MB';
+    const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-        const formData = new FormData();
-        imageFiles.forEach(file => formData.append('files', file));
+    function toast(message, bad = false) {
+        const el = h('div', { class: 'toast' + (bad ? ' toast--bad' : ''), role: 'status' }, message);
+        $('#toasts').append(el);
+        setTimeout(() => el.remove(), bad ? 6500 : 3500);
+    }
 
+    async function api(path, options = {}) {
+        const opts = { credentials: 'same-origin', ...options, headers: { ...(options.headers || {}) } };
+        if (opts.method && opts.method !== 'GET') opts.headers['X-CSRF-Token'] = CFG.csrf;
+        let response;
         try {
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.sessionId = result.session_id;
-                this.uploadedFiles = result.files;
-                // Store the actual File objects for canvas loading
-                this.actualUploadedFiles = imageFiles;
-                console.log('Stored actual files:', this.actualUploadedFiles);
-                console.log('Stored file info:', this.uploadedFiles);
-                this.displayFiles();
-                this.showAlert(result.message, 'success');
-            } else {
-                this.showAlert(result.error, 'error');
-            }
-        } catch (error) {
-            this.showAlert('Upload failed: ' + error.message, 'error');
+            response = await fetch(path, opts);
+        } catch {
+            throw new Error('Could not reach the server. Check your connection and try again.');
         }
+        if (response.status === 401) { window.location.href = '/login'; throw new Error('Please sign in.'); }
+        let data = null;
+        try { data = await response.json(); } catch { /* not JSON */ }
+        if (!response.ok) throw new Error((data && data.error) || `Request failed (${response.status}).`);
+        return data;
     }
 
-    displayFiles() {
-        const fileGrid = document.getElementById('fileGrid');
-        const uploadedFiles = document.getElementById('uploadedFiles');
-        const autoDetectionInfo = document.getElementById('autoDetectionInfo');
-
-        fileGrid.innerHTML = '';
-
-        this.uploadedFiles.forEach(file => {
-            const fileCard = document.createElement('div');
-            fileCard.className = 'file-card';
-
-            // Create image preview using FileReader
-            const preview = this.createImagePreview(file);
-
-            fileCard.innerHTML = `
-                ${preview}
-                <div class="file-info">
-                    <div class="file-name">${file.filename}</div>
-                    <div class="file-details">
-                        ${file.width && file.height ? `${file.width} × ${file.height}px<br>` : ''}
-                        ${file.size_mb} MB
-                    </div>
-                </div>
-            `;
-
-            // Add click-to-enlarge on the preview image
-            setTimeout(() => {
-                const imgEl = fileCard.querySelector('img[data-filename="' + file.filename.replace(/"/g, '&quot;') + '"]');
-                if (imgEl) {
-                    imgEl.addEventListener('click', () => this.openImageModal(imgEl.src));
-                    imgEl.style.cursor = 'zoom-in';
-                    imgEl.title = 'Click to view full size';
-                }
-            }, 0);
-
-            fileGrid.appendChild(fileCard);
-        });
-
-        uploadedFiles.style.display = 'block';
-        autoDetectionInfo.style.display = 'block';
-
-        // Show processing options immediately
-        document.getElementById('processingOptions').style.display = 'block';
-    }
-
-    createImagePreview(file) {
-        // Try to create a preview using the uploaded File object if available
-        const actual = this.actualUploadedFiles.find(f => f.name === file.filename);
-        if (actual) {
-            const url = URL.createObjectURL(actual);
-            return `<div class="file-preview"><img data-filename="${file.filename}" src="${url}" alt="${file.filename}"></div>`;
+    // ---------------------------------------------------------------- engine status pill
+    async function refreshEngine() {
+        const pill = $('#enginePill'), text = $('#engineText');
+        let next = 30000;
+        try {
+            const res = await fetch('/health', { cache: 'no-store' });
+            const data = await res.json();
+            const e = data.engine || {};
+            pill.className = 'pill';
+            if (data.status === 'error') { pill.classList.add('pill--bad'); text.textContent = 'Engine error'; pill.title = e.error || ''; }
+            else if (!e.ready) { pill.classList.add('pill--warn'); text.textContent = 'Loading models…'; next = 2000; }
+            else if (e.gpu_name && e.device.startsWith('cuda')) {
+                pill.classList.add('pill--ok');
+                text.textContent = 'GPU · ' + e.gpu_name.replace(/^NVIDIA GeForce /, '').replace(/ Laptop GPU$/, '');
+            } else { pill.classList.add('pill--warn'); text.textContent = 'CPU mode (slower)'; }
+        } catch {
+            pill.className = 'pill pill--bad'; text.textContent = 'Offline'; next = 5000;
         }
-        // Fallback placeholder
-        return `<div class="file-preview">
-            <i class="fas fa-image"></i>
-            <div style="font-size: 0.8rem; margin-top: 5px;">${file.filename}</div>
-        </div>`;
+        setTimeout(refreshEngine, next);
     }
 
-    openImageModal(src) {
-        const overlay = document.getElementById('imageModal');
-        const img = document.getElementById('imageModalImg');
-        img.src = src;
-        overlay.style.display = 'flex';
+    // ---------------------------------------------------------------- settings
+    const fields = {
+        iter: $('#optIter'), max: $('#optMax'), resize: $('#optResize'),
+        fw: $('#optFW'), fh: $('#optFH'), post: $('#optPost'), plates: $('#optPlates'),
+    };
+    const presetRadios = [...document.querySelectorAll('input[name=preset]')];
+    const currentPreset = () => (presetRadios.find((r) => r.checked) || {}).value || 'balanced';
+
+    function applyPreset(name) {
+        const p = PRESETS[name];
+        if (!p) return;
+        fields.iter.value = p.iterations;
+        fields.max.value = p.max_size;
     }
-
-    closeImageModal() {
-        const overlay = document.getElementById('imageModal');
-        const img = document.getElementById('imageModalImg');
-        img.src = '';
-        overlay.style.display = 'none';
-    }
-
-    async processImages() {
-        const processBtn = document.getElementById('processBtn');
-        const loading = document.getElementById('loading');
-        const progressBar = document.getElementById('progressBar');
-        const progressFill = document.getElementById('progressFill');
-
-        processBtn.disabled = true;
-        loading.style.display = 'block';
-        progressBar.style.display = 'block';
-
-        // Simulate progress
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-            progress += Math.random() * 15;
-            if (progress > 90) progress = 90;
-            progressFill.style.width = progress + '%';
-        }, 500);
-
-        const params = {
-            num_iterations: parseInt(document.getElementById('numIterations').value),
-            max_size: parseInt(document.getElementById('maxSize').value),
-            resize_to: parseInt(document.getElementById('resizeTo').value),
-            force_width: parseInt(document.getElementById('forceWidth').value),
-            force_height: parseInt(document.getElementById('forceHeight').value),
-            enhance_plates: true  // Always true for automatic detection
+    function readParams() {
+        const num = (el, d) => (Number.isFinite(el.valueAsNumber) ? el.valueAsNumber : d);
+        return {
+            iterations: num(fields.iter, 8), max_size: num(fields.max, 1500), resize_to: num(fields.resize, 0),
+            force_width: num(fields.fw, 0), force_height: num(fields.fh, 0),
+            detect_plates: fields.plates.checked, post_enhance: fields.post.checked,
         };
+    }
+    function saveSettings() {
+        store.set(SETTINGS_KEY, { preset: currentPreset(), ...readParams() });
+    }
+    function loadSettings() {
+        const s = store.get(SETTINGS_KEY);
+        if (!s) return;
+        const radio = presetRadios.find((r) => r.value === s.preset);
+        if (radio) radio.checked = true;
+        fields.iter.value = s.iterations ?? 8; fields.max.value = s.max_size ?? 1500;
+        fields.resize.value = s.resize_to ?? 0; fields.fw.value = s.force_width ?? 0; fields.fh.value = s.force_height ?? 0;
+        fields.plates.checked = s.detect_plates !== false; fields.post.checked = !!s.post_enhance;
+    }
 
-        try {
-            const response = await fetch('/process', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(params)
-            });
+    // ---------------------------------------------------------------- selecting files
+    const dropzone = $('#dropzone'), fileInput = $('#fileInput');
 
-            const result = await response.json();
-
-            clearInterval(progressInterval);
-            progressFill.style.width = '100%';
-
-            if (result.success) {
-                setTimeout(() => {
-                    loading.style.display = 'none';
-                    this.displayResults(result);
-                    this.showAlert(result.message, 'success');
-                }, 1000);
-            } else {
-                loading.style.display = 'none';
-                this.showAlert(result.error, 'error');
+    function addFiles(list) {
+        let skipped = 0, tooMany = false;
+        for (const file of list) {
+            if (!(file.type.startsWith('image/') || IMAGE_RE.test(file.name)) || !IMAGE_RE.test(file.name || 'x.png')) { skipped++; continue; }
+            if (files.length >= CFG.maxImages) { tooMany = true; break; }
+            files.push({ id: crypto.randomUUID ? crypto.randomUUID() : String(Math.random()), file, url: URL.createObjectURL(file) });
+        }
+        const total = files.reduce((n, f) => n + f.file.size, 0);
+        if (total > CFG.maxMb * 1048576) {
+            while (files.length && files.reduce((n, f) => n + f.file.size, 0) > CFG.maxMb * 1048576) {
+                URL.revokeObjectURL(files.pop().url);
             }
-        } catch (error) {
-            clearInterval(progressInterval);
-            loading.style.display = 'none';
-            this.showAlert('Processing failed: ' + error.message, 'error');
-        } finally {
-            processBtn.disabled = false;
+            toast(`That is more than ${CFG.maxMb} MB in total. Some images were left out.`, true);
         }
+        if (skipped) toast(`${plural(skipped, 'file')} skipped: only PNG, JPG, BMP, TIFF and WebP images work.`, true);
+        if (tooMany) toast(`You can add up to ${CFG.maxImages} images at a time.`, true);
+        renderThumbs();
+    }
+    function removeFile(id) {
+        const i = files.findIndex((f) => f.id === id);
+        if (i >= 0) { URL.revokeObjectURL(files[i].url); files.splice(i, 1); renderThumbs(); }
+    }
+    function clearFiles() {
+        files.forEach((f) => URL.revokeObjectURL(f.url));
+        files = [];
+        renderThumbs();
+    }
+    function renderThumbs() {
+        const list = $('#thumbs');
+        list.replaceChildren(...files.map((f) => h('li', { class: 'thumb' },
+            h('img', { src: f.url, alt: '', loading: 'lazy' }),
+            h('div', { class: 'thumb__meta', title: f.file.name }, `${f.file.name} · ${fmtMB(f.file.size)}`),
+            h('button', { class: 'thumb__remove', type: 'button', 'aria-label': `Remove ${f.file.name}`, onclick: () => removeFile(f.id) },
+                icon('x')))));
+        $('#clearBtn').hidden = files.length === 0;
+        updateProcessButton();
+    }
+    function updateProcessButton() {
+        const btn = $('#processBtn'), label = $('#processLabel');
+        btn.disabled = busy || files.length === 0;
+        label.textContent = busy ? 'Working…' : files.length ? `Clean ${plural(files.length, 'image')}` : 'Add images to start';
     }
 
-    async processImages() {
-        const btn = document.getElementById('processBtn');
-        const loading = document.getElementById('loading');
-        const progressBar = document.getElementById('progressBar');
-        const progressFill = document.getElementById('progressFill');
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+    fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+    ['dragenter', 'dragover'].forEach((t) => dropzone.addEventListener(t, (e) => { e.preventDefault(); dropzone.classList.add('is-over'); }));
+    ['dragleave', 'drop'].forEach((t) => dropzone.addEventListener(t, (e) => { e.preventDefault(); dropzone.classList.remove('is-over'); }));
+    dropzone.addEventListener('drop', (e) => addFiles(e.dataTransfer.files));
+    // Window-level drop so a missed drop never navigates away from the page
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('drop', (e) => { e.preventDefault(); if (!dropzone.contains(e.target) && e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+    document.addEventListener('paste', (e) => {
+        const pasted = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'))
+            .map((f) => (f.name && IMAGE_RE.test(f.name) ? f : new File([f], 'pasted-' + Date.now() + '.png', { type: f.type })));
+        if (pasted.length) addFiles(pasted);
+    });
+    $('#clearBtn').addEventListener('click', clearFiles);
 
-        btn.disabled = true;
-        loading.style.display = 'block';
-        progressBar.style.display = 'block';
+    presetRadios.forEach((r) => r.addEventListener('change', () => { applyPreset(r.value); saveSettings(); }));
+    Object.values(fields).forEach((el) => el.addEventListener('change', saveSettings));
 
-        // Simulate progress
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-            progress += Math.random() * 20;
-            if (progress > 95) progress = 95;
-            progressFill.style.width = progress + '%';
-        }, 500);
+    // ---------------------------------------------------------------- running a job
+    async function startJob() {
+        if (busy || !files.length) return;
+        const error = $('#formError');
+        error.hidden = true;
+        busy = true; updateProcessButton();
+        saveSettings();
 
-        const params = {
-            num_iterations: parseInt(document.getElementById('numIterations').value),
-            max_size: parseInt(document.getElementById('maxSize').value),
-            resize_to: parseInt(document.getElementById('resizeTo').value),
-            force_width: parseInt(document.getElementById('forceWidth').value),
-            force_height: parseInt(document.getElementById('forceHeight').value)
-        };
-
+        const form = new FormData();
+        files.forEach((f) => form.append('files', f.file, f.file.name));
+        form.append('params', JSON.stringify(readParams()));
         try {
-            const response = await fetch('/process', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(params)
-            });
+            job = await api('/api/jobs', { method: 'POST', body: form });
+            store.set(LAST_JOB_KEY, job.id);
+            history.replaceState(null, '', '?job=' + job.id);
+            clearFiles();
+            showResults();
+            schedulePoll(600);
+        } catch (err) {
+            error.textContent = err.message;
+            error.hidden = false;
+            busy = false; updateProcessButton();
+        }
+    }
+    $('#processBtn').addEventListener('click', startJob);
 
-            const result = await response.json();
-
-            clearInterval(progressInterval);
-            progressFill.style.width = '100%';
-
-            if (result.success) {
-                setTimeout(() => {
-                    loading.style.display = 'none';
-                    this.displayResults(result);
-                    this.showAlert(result.message, 'success');
-                }, 1000);
-            } else {
-                loading.style.display = 'none';
-                this.showAlert(result.error, 'error');
+    function schedulePoll(delay = 1000, failures = 0) {
+        clearTimeout(pollTimer);
+        pollTimer = setTimeout(async () => {
+            if (!job) return;
+            try {
+                job = await api('/api/jobs/' + job.id);
+                showResults();
+                if (job.status === 'queued' || job.status === 'running') schedulePoll(1000);
+                else { busy = false; updateProcessButton(); }
+            } catch (err) {
+                if (failures >= 4) { toast(err.message, true); busy = false; updateProcessButton(); }
+                else schedulePoll(2000 * (failures + 1), failures + 1);
             }
-        } catch (error) {
-            clearInterval(progressInterval);
-            loading.style.display = 'none';
-            this.showAlert('Processing failed: ' + error.message, 'error');
-        } finally {
-            btn.disabled = false;
-        }
+        }, delay);
     }
 
-
-    displayResults(apiResult) {
-        const resultsCard = document.getElementById('resultsCard');
-        const statsBar = document.getElementById('statsBar');
-
-        // Display processed results
-        const processedResults = document.getElementById('processedResults');
-        const dehazedResults = document.getElementById('dehazedResults');
-        const plateCrops = document.getElementById('plateCrops');
-        const detectionInfo = document.getElementById('detectionInfo');
-
-        const results = apiResult.results || [];
-        const dehazed = apiResult.dehazed_results || [];
-        const crops = apiResult.plate_crops || [];
-
-        // Dehazed images
-        if (dehazed.length > 0) {
-            let dhtml = '';
-            dehazed.forEach((item, index) => {
-                dhtml += `
-                    <div style="margin-bottom: 20px;">
-                        <img src="/download/${this.sessionId}/${item.filename}" class="result-image" alt="Dehazed Image ${index + 1}" style="max-width: 100%; height: auto;">
-                        <div style="margin-top: 10px;">
-                            <a href="/download/${this.sessionId}/${item.filename}" class="result-download">
-                                <i class="fas fa-download"></i> Download Dehazed Image ${index + 1}
-                            </a>
-                        </div>
-                    </div>
-                `;
-            });
-            dehazedResults.innerHTML = dhtml;
-        } else {
-            dehazedResults.innerHTML = '<p style="color:#6b7280">No dehazed images found</p>';
-        }
-
-        // Processed results
-        if (results.length > 0) {
-            let resultsHTML = '';
-            results.forEach((result, index) => {
-                resultsHTML += `
-                    <div style="margin-bottom: 20px;">
-                        <img src="/download/${this.sessionId}/${result.filename}" class="result-image" alt="Processed Image ${index + 1}" style="max-width: 100%; height: auto;">
-                        <div style="margin-top: 10px;">
-                            <a href="/download/${this.sessionId}/${result.filename}" class="result-download">
-                                <i class="fas fa-download"></i> Download Processed Image ${index + 1}
-                            </a>
-                        </div>
-                    </div>
-                `;
-            });
-            processedResults.innerHTML = resultsHTML;
-        } else {
-            processedResults.innerHTML = '<p style="color:#6b7280">No processed images found</p>';
-        }
-
-        // Plate crops
-        if (crops.length > 0) {
-            let chtml = '';
-            crops.forEach((item, index) => {
-                chtml += `
-                    <div style="margin-bottom: 10px;">
-                        <img src="/download/${this.sessionId}/${item.filename}" class="result-image" alt="Plate Crop ${index + 1}" style="max-width: 100%; height: auto;">
-                    </div>
-                `;
-            });
-            plateCrops.innerHTML = chtml;
-        } else {
-            plateCrops.innerHTML = '<p style="color:#6b7280">No plate crops found</p>';
-        }
-
-        // Display detection information
-        const infoList = apiResult.detection_info || [];
-        if (infoList.length > 0) {
-            let detectionHTML = '';
-            infoList.forEach(info => {
-                detectionHTML += `<div class="detection-item"><i class="fas fa-check-circle"></i> ${info}</div>`;
-            });
-            detectionInfo.innerHTML = detectionHTML;
-        } else {
-            detectionInfo.innerHTML = '<div class="detection-item"><i class="fas fa-info-circle"></i> No license plates detected</div>';
-        }
-
-        // Update stats
-        document.getElementById('totalImages').textContent = results.length + dehazed.length;
-        document.getElementById('processedImages').textContent = results.length;
-        let totalSize = results.reduce((sum, r) => sum + r.size_mb, 0) + dehazed.reduce((s, r) => s + r.size_mb, 0);
-        document.getElementById('totalSize').textContent = totalSize.toFixed(1);
-
-        statsBar.style.display = 'block';
-        resultsCard.style.display = 'block';
+    async function cancelJob() {
+        try { job = await api(`/api/jobs/${job.id}/cancel`, { method: 'POST' }); showResults(); toast('Stopping after the current image…'); }
+        catch (err) { toast(err.message, true); }
     }
 
-
-    async downloadAll() {
-        // This would need to be implemented as a zip download on the backend
-        this.showAlert('Download all feature coming soon!', 'success');
+    function newBatch() {
+        clearTimeout(pollTimer);
+        job = null; busy = false;
+        cardCache.clear();
+        $('#resultsSection').hidden = true;
+        store.del(LAST_JOB_KEY);
+        history.replaceState(null, '', location.pathname);
+        updateProcessButton();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    async newSession() {
-        try {
-            await fetch('/cleanup', { method: 'POST' });
-            this.clearAll();
-            this.showAlert('New session started', 'success');
-        } catch (error) {
-            this.showAlert('Failed to start new session', 'error');
-        }
-    }
+    // ---------------------------------------------------------------- rendering results
+    const TITLES = {
+        queued: 'Waiting in line…', running: 'Cleaning your images…', done: 'All done',
+        error: 'Something went wrong', cancelled: 'Cancelled',
+    };
 
-    clearAll() {
-        this.uploadedFiles = [];
-        this.actualUploadedFiles = [];
-        this.sessionId = null;
+    function showResults() {
+        if (!job) return;
+        const section = $('#resultsSection');
+        section.hidden = false;
+        const { done, total, percent } = job.progress;
+        const active = job.status === 'queued' || job.status === 'running';
 
-        // Clear canvas
-        if (this.canvas && this.ctx) {
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            this.currentImage = null;
-            this.selections = [];
-        }
+        $('#resultsTitle').textContent = TITLES[job.status] || 'Results';
+        $('#resultsSub').textContent = active ? `${done} of ${plural(total, 'image')} finished` : (job.error || '');
+        const bar = $('#progress');
+        bar.classList.toggle('is-done', !active);
+        bar.setAttribute('aria-valuenow', String(percent));
+        $('#progressBar').style.width = Math.max(percent, active ? 4 : 100) + '%';
 
-        document.getElementById('uploadedFiles').style.display = 'none';
-        document.getElementById('imageSelection').style.display = 'none';
-        document.getElementById('processingOptions').style.display = 'none';
-        document.getElementById('resultsCard').style.display = 'none';
-        document.getElementById('statsBar').style.display = 'none';
-        document.getElementById('fileInput').value = '';
-
-        this.showAlert('All files cleared', 'success');
-    }
-
-    async checkSession() {
-        try {
-            const response = await fetch('/status');
-            const status = await response.json();
-
-            if (status.has_files) {
-                this.sessionId = status.session_id;
-                // Could restore session state here
+        const actions = $('#resultsActions');
+        actions.replaceChildren();
+        if (active) actions.append(h('button', { class: 'btn', type: 'button', onclick: cancelJob }, 'Cancel'));
+        else {
+            if (job.downloads) {
+                actions.append(h('a', { class: 'btn btn--primary', href: job.downloads.zip }, icon('download'), 'Download all (ZIP)'));
+                if (job.summary.plates_found) actions.append(h('a', { class: 'btn', href: job.downloads.csv + '?download=1' }, icon('file'), 'Plates (CSV)'));
             }
-        } catch (error) {
-            console.log('Session check failed:', error);
+            actions.append(h('button', { class: 'btn', type: 'button', onclick: newBatch }, icon('plus'), 'New batch'));
         }
+        renderSummary();
+        renderCards();
+        busy = active;
+        updateProcessButton();
     }
 
-    showAlert(message, type) {
-        const alert = document.getElementById('alert');
-        alert.textContent = message;
-        alert.className = `alert alert-${type}`;
-        alert.style.display = 'block';
-
-        setTimeout(() => {
-            alert.style.display = 'none';
-        }, 5000);
-    }
-
-    // Selection tool methods
-    initSelectionTool() {
-        this.canvas = document.getElementById('selectionCanvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.selections = [];
-        this.isDrawing = false;
-        this.startX = 0;
-        this.startY = 0;
-        this.currentImage = null;
-
-        this.canvas.addEventListener('mousedown', this.startDrawing.bind(this));
-        this.canvas.addEventListener('mousemove', this.draw.bind(this));
-        this.canvas.addEventListener('mouseup', this.endDrawing.bind(this));
-    }
-
-    startDrawing(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        this.startX = e.clientX - rect.left;
-        this.startY = e.clientY - rect.top;
-        this.isDrawing = true;
-    }
-
-    draw(e) {
-        if (!this.isDrawing) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const currentX = e.clientX - rect.left;
-        const currentY = e.clientY - rect.top;
-
-        // Clear canvas and redraw image
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        if (this.currentImage) {
-            this.ctx.drawImage(this.currentImage, 0, 0, this.canvas.width, this.canvas.height);
+    function renderSummary() {
+        const box = $('#summary');
+        box.replaceChildren();
+        if (job.status !== 'done' && job.status !== 'cancelled') return;
+        const items = job.items;
+        const ok = items.filter((i) => i.status === 'done').length;
+        const failed = items.filter((i) => i.status === 'error').length;
+        const secs = items.reduce((n, i) => n + (i.seconds || 0), 0);
+        box.append(h('span', { class: 'chip chip--ok' }, icon('check'), `${plural(ok, 'image')} cleaned`));
+        if (failed) box.append(h('span', { class: 'chip chip--bad' }, `${failed} failed`));
+        if (job.params.detect_plates) {
+            box.append(h('span', { class: 'chip' }, `${plural(job.summary.plates_found, 'plate')} found`));
+            if (job.summary.plates_found) box.append(h('span', { class: job.summary.plates_valid ? 'chip chip--ok' : 'chip chip--warn' },
+                `${job.summary.plates_valid} read as valid Indian plates`));
         }
-
-        // Draw existing selections
-        this.drawSelections();
-
-        // Draw current selection
-        this.ctx.strokeStyle = '#ff0000';
-        this.ctx.lineWidth = 2;
-        this.ctx.setLineDash([5, 5]);
-        this.ctx.strokeRect(this.startX, this.startY, currentX - this.startX, currentY - this.startY);
+        if (secs) box.append(h('span', { class: 'chip' }, `${secs.toFixed(1)} s total`));
     }
 
-    endDrawing(e) {
-        if (!this.isDrawing) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const endX = e.clientX - rect.left;
-        const endY = e.clientY - rect.top;
-
-        // Create selection box
-        const selection = {
-            x: Math.min(this.startX, endX),
-            y: Math.min(this.startY, endY),
-            width: Math.abs(endX - this.startX),
-            height: Math.abs(endY - this.startY)
-        };
-
-        // Only add if selection is large enough
-        if (selection.width > 20 && selection.height > 20) {
-            this.selections.push(selection);
-            this.updateSelectionStatus();
-            this.drawSelections();
+    function renderCards() {
+        const container = $('#cards');
+        const seen = new Set();
+        const order = [];
+        for (const item of job.items) {
+            seen.add(item.id);
+            const sig = JSON.stringify(item);
+            let entry = cardCache.get(item.id);
+            if (!entry || entry.sig !== sig) {
+                entry = { sig, el: buildCard(item) };
+                cardCache.set(item.id, entry);
+            }
+            order.push(entry.el);
         }
-
-        this.isDrawing = false;
+        for (const id of [...cardCache.keys()]) if (!seen.has(id)) cardCache.delete(id);
+        container.replaceChildren(...order);
     }
 
-    drawSelections() {
-        this.selections.forEach((selection, index) => {
-            this.ctx.strokeStyle = '#00ff00';
-            this.ctx.lineWidth = 3;
-            this.ctx.setLineDash([]);
-            this.ctx.strokeRect(selection.x, selection.y, selection.width, selection.height);
+    function buildCard(item) {
+        const meta = item.status === 'done'
+            ? [item.width && `${item.width}×${item.height}`, item.seconds != null && `${item.seconds.toFixed(1)} s`].filter(Boolean).join(' · ') : '';
+        const card = h('article', { class: 'result' },
+            h('div', { class: 'result__head' }, h('span', { class: 'result__name', title: item.name }, item.name),
+                h('span', { class: 'result__meta' }, meta)));
 
-            // Add selection number
-            this.ctx.fillStyle = '#00ff00';
-            this.ctx.font = '16px Arial';
-            this.ctx.fillText(`${index + 1}`, selection.x + 5, selection.y + 20);
+        if (item.status === 'queued') card.append(h('div', { class: 'result__state' }, h('span', {}, 'Waiting…')));
+        else if (item.status === 'processing') card.append(h('div', { class: 'result__state' }, h('div', { class: 'spinner' }), h('span', {}, 'Cleaning the haze…')));
+        else if (item.status === 'cancelled') card.append(h('div', { class: 'result__state' }, h('span', {}, 'Skipped')));
+        else if (item.status === 'error') card.append(h('div', { class: 'result__error', role: 'alert' }, icon('alert'), item.error || 'This image could not be processed.'));
+        else buildDone(card, item);
+        return card;
+    }
+
+    function buildDone(card, item) {
+        const f = item.files;
+        const hasPlates = item.plates.length > 0;
+        const views = [
+            { id: 'compare', label: 'Before / After' },
+            { id: 'dehazed', label: 'Cleaned', src: f.dehazed },
+            ...(hasPlates ? [{ id: 'result', label: 'With plates', src: f.result }] : []),
+        ];
+        const stage = h('div', { class: 'stage' });
+        const tabs = h('div', { class: 'tabs', role: 'tablist' });
+
+        function show(view) {
+            tabs.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.view === view.id)));
+            stage.replaceChildren(view.id === 'compare' ? buildCompare(item) : zoomable(h('img', { src: view.src, alt: `${item.name}: ${view.label}` })));
+        }
+        views.forEach((v, i) => tabs.append(h('button', { class: 'tab', type: 'button', role: 'tab', 'data-view': v.id, onclick: () => show(v) }, v.label)));
+        card.append(tabs, stage);
+        show(views[0]);
+
+        const body = h('div', { class: 'result__body' });
+        if (item.fallback) body.append(h('div', { class: 'chip chip--warn' }, 'Result looked blank, so the original is shown'));
+        if (hasPlates) {
+            body.append(h('div', { class: 'plates' }, h('div', { class: 'plates__title' }, 'Licence plates'), item.plates.map(plateRow)));
+        } else if (job.params.detect_plates) {
+            body.append(h('p', { class: 'muted' }, 'No licence plates found in this image.'));
+        }
+        body.append(h('div', { class: 'result__links' },
+            h('a', { class: 'btn btn--small', href: f.dehazed_png + '?download=1' }, icon('download'), 'Cleaned (PNG)'),
+            hasPlates ? h('a', { class: 'btn btn--small', href: f.result_png + '?download=1' }, icon('download'), 'With plates (PNG)') : null));
+        card.append(body);
+    }
+
+    function buildCompare(item) {
+        const f = item.files;
+        const range = h('input', { class: 'compare__range', type: 'range', min: '0', max: '100', value: '50', 'aria-label': 'Drag to compare before and after' });
+        const wrap = h('div', { class: 'compare' },
+            h('div', { class: 'compare__after' }, h('img', { src: f.dehazed, alt: `${item.name}: after`, draggable: 'false' })),
+            h('div', { class: 'compare__before' }, h('img', { src: f.original, alt: `${item.name}: before`, draggable: 'false' })),
+            range, h('div', { class: 'compare__line' }),
+            h('span', { class: 'tag tag--l' }, 'Before'), h('span', { class: 'tag tag--r' }, 'After'));
+        wrap.style.setProperty('--pos', '50%');
+        range.addEventListener('input', () => wrap.style.setProperty('--pos', range.value + '%'));
+        return wrap;
+    }
+
+    function zoomable(img) { img.addEventListener('click', () => openLightbox(img.src)); return img; }
+
+    function plateRow(plate) {
+        const text = plate.formatted_text || plate.text || '';
+        const badge = plate.valid ? h('span', { class: 'badge badge--ok' }, 'Valid Indian plate')
+            : h('span', { class: 'badge badge--warn' }, text ? 'Check by eye' : 'Could not read');
+        const crop = plate.crop ? zoomable(h('img', { src: plate.crop, alt: 'Plate close-up', loading: 'lazy' })) : null;
+        const copy = text ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Copy plate number', title: 'Copy',
+            onclick: async () => { try { await navigator.clipboard.writeText(text); toast('Copied ' + text); } catch { toast('Could not copy', true); } } }, icon('copy')) : null;
+        return h('div', { class: 'plate' }, crop,
+            h('div', { class: 'plate__main' },
+                h('span', { class: 'plate__text' }, text || '—'),
+                h('span', { class: 'plate__sub' }, `${plate.color && plate.color !== 'unknown' ? plate.color + ' plate · ' : ''}found by ${plate.method === 'yolo' ? 'plate detector' : plate.method}`)),
+            badge, copy);
+    }
+
+    // ---------------------------------------------------------------- lightbox, drawer, menus
+    const lightbox = $('#lightbox');
+    function openLightbox(src) { $('#lightboxImg').src = src; lightbox.hidden = false; }
+    function closeLightbox() { lightbox.hidden = true; $('#lightboxImg').removeAttribute('src'); }
+    lightbox.addEventListener('click', (e) => { if (e.target !== $('#lightboxImg')) closeLightbox(); });
+
+    const drawer = $('#drawer');
+    async function openHistory() {
+        drawer.hidden = false;
+        const list = $('#historyList');
+        list.replaceChildren(h('li', { class: 'empty' }, 'Loading…'));
+        try {
+            const { jobs } = await api('/api/jobs');
+            list.replaceChildren(...(jobs.length ? jobs.map(historyRow) : [h('li', { class: 'empty' }, 'No batches yet.')]));
+        } catch (err) { list.replaceChildren(h('li', { class: 'empty' }, err.message)); }
+        $('#drawerClose').focus();
+    }
+    function historyRow(j) {
+        const when = new Date(j.created * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+        const state = j.status === 'done' ? '' : ` · ${j.status}`;
+        return h('li', { class: 'history__item' },
+            j.thumb ? h('img', { class: 'history__thumb', src: j.thumb, alt: '', loading: 'lazy' }) : h('div', { class: 'history__thumb' }),
+            h('button', { class: 'history__open', type: 'button', onclick: () => openJob(j.id) },
+                h('strong', {}, plural(j.images, 'image')), h('span', {}, `${when}${state}${j.plates ? ' · ' + plural(j.plates, 'plate') : ''}`)),
+            h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Delete this batch', title: 'Delete', onclick: () => removeJob(j.id) }, icon('trash')));
+    }
+    async function openJob(id) {
+        try {
+            clearTimeout(pollTimer);
+            cardCache.clear();
+            job = await api('/api/jobs/' + id);
+            store.set(LAST_JOB_KEY, id);
+            history.replaceState(null, '', '?job=' + id);
+            drawer.hidden = true;
+            showResults();
+            if (job.status === 'queued' || job.status === 'running') schedulePoll(800);
+            $('#resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (err) { toast(err.message, true); }
+    }
+    async function removeJob(id) {
+        if (!confirm('Delete this batch and its results?')) return;
+        try {
+            await api('/api/jobs/' + id, { method: 'DELETE' });
+            if (job && job.id === id) newBatch();
+            openHistory();
+        } catch (err) { toast(err.message, true); }
+    }
+    $('#historyBtn').addEventListener('click', openHistory);
+    $('#drawerClose').addEventListener('click', () => { drawer.hidden = true; });
+    $('#drawerScrim').addEventListener('click', () => { drawer.hidden = true; });
+
+    const userBtn = $('#userBtn'), userMenu = $('#userDropdown');
+    if (userBtn) {
+        const toggle = (open) => { userMenu.hidden = !open; userBtn.setAttribute('aria-expanded', String(open)); };
+        userBtn.addEventListener('click', (e) => { e.stopPropagation(); toggle(userMenu.hidden); });
+        document.addEventListener('click', (e) => { if (!userMenu.contains(e.target)) toggle(false); });
+        $('#logoutBtn').addEventListener('click', async () => {
+            try { await api('/logout', { method: 'POST' }); } catch { /* leave anyway */ }
+            store.del(LAST_JOB_KEY);
+            window.location.href = '/login';
         });
     }
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        closeLightbox(); drawer.hidden = true;
+        if (userBtn) { userMenu.hidden = true; userBtn.setAttribute('aria-expanded', 'false'); }
+    });
 
-    clearSelection() {
-        this.selections = [];
-        this.updateSelectionStatus();
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        if (this.currentImage) {
-            this.ctx.drawImage(this.currentImage, 0, 0, this.canvas.width, this.canvas.height);
-        }
+    // ---------------------------------------------------------------- start up
+    loadSettings();
+    renderThumbs();
+    refreshEngine();
+
+    const wanted = new URLSearchParams(location.search).get('job') || store.get(LAST_JOB_KEY);
+    if (wanted && /^[a-f0-9]{8,32}$/.test(wanted)) {
+        api('/api/jobs/' + wanted).then((data) => {
+            job = data;
+            showResults();
+            if (job.status === 'queued' || job.status === 'running') schedulePoll(800);
+        }).catch(() => { store.del(LAST_JOB_KEY); history.replaceState(null, '', location.pathname); });
     }
-
-    updateSelectionStatus() {
-        const statusText = document.querySelector('.status-text');
-        const selectionCount = document.querySelector('.selection-count');
-
-        if (this.selections.length === 0) {
-            statusText.textContent = 'No regions selected';
-            selectionCount.textContent = '0 regions';
-        } else {
-            statusText.textContent = 'Regions selected';
-            selectionCount.textContent = `${this.selections.length} region${this.selections.length > 1 ? 's' : ''}`;
-        }
-    }
-
-    confirmSelection() {
-        if (this.selections.length === 0) {
-            this.showAlert('Please select at least one region first', 'error');
-            return;
-        }
-
-        // Hide selection tool and show processing options
-        document.getElementById('imageSelection').style.display = 'none';
-        document.getElementById('processingOptions').style.display = 'block';
-
-        this.showAlert(`Confirmed ${this.selections.length} selection(s)`, 'success');
-    }
-
-    loadImageToCanvas(imageFile) {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-                // Calculate canvas size to fit image with better aspect ratio handling
-                const maxWidth = 800;
-                const maxHeight = 600;
-                let { width, height } = img;
-
-                // Calculate aspect ratios
-                const imageAspect = width / height;
-                const canvasAspect = maxWidth / maxHeight;
-
-                let canvasWidth, canvasHeight;
-
-                if (imageAspect > canvasAspect) {
-                    // Image is wider than canvas
-                    canvasWidth = maxWidth;
-                    canvasHeight = maxWidth / imageAspect;
-                } else {
-                    // Image is taller than canvas
-                    canvasHeight = maxHeight;
-                    canvasWidth = maxHeight * imageAspect;
-                }
-
-                // Store original image dimensions for coordinate scaling
-                this.originalImageWidth = width;
-                this.originalImageHeight = height;
-                this.canvasDisplayWidth = canvasWidth;
-                this.canvasDisplayHeight = canvasHeight;
-
-                this.canvas.width = canvasWidth;
-                this.canvas.height = canvasHeight;
-
-                // Draw image
-                this.ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
-                this.currentImage = img;
-
-                // Show success message briefly
-                this.ctx.fillStyle = '#10b981';
-                this.ctx.font = '14px Arial';
-                this.ctx.textAlign = 'center';
-                this.ctx.fillText('Image loaded! Draw selection boxes around license plates', canvasWidth / 2, canvasHeight - 20);
-
-                // Clear the message after 3 seconds
-                setTimeout(() => {
-                    if (this.currentImage === img) {
-                        this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-                        this.ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
-                    }
-                }, 3000);
-
-                resolve();
-            };
-            img.src = URL.createObjectURL(imageFile);
-        });
-    }
-
-    loadImageToCanvasFromFile(fileInfo) {
-        console.log('Loading image:', fileInfo);
-        console.log('Available files:', this.actualUploadedFiles);
-
-        // Show loading state
-        const canvas = document.getElementById('selectionCanvas');
-        const ctx = canvas.getContext('2d');
-
-        // Clear canvas and show loading message
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#6b7280';
-        ctx.font = '16px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Loading image...', canvas.width / 2, canvas.height / 2);
-
-        // Get the actual file from the stored files
-        const actualFile = this.actualUploadedFiles.find(f => f.name === fileInfo.filename);
-        if (actualFile) {
-            console.log('Found actual file:', actualFile);
-            this.loadImageToCanvas(actualFile);
-        } else {
-            // Fallback: try to load from the file info
-            console.log('Loading image from file info:', fileInfo);
-            console.log('File not found in actualUploadedFiles');
-            // We need to store the actual File objects when uploading
-            this.showAlert('Image loading issue - please try uploading again', 'error');
-        }
-    }
-}
-
-// Welcome modal functions
-function closeWelcomeModal() {
-    document.getElementById('welcomeModal').style.display = 'none';
-    // Store in localStorage so it doesn't show again in this session
-    localStorage.setItem('welcomeShown', 'true');
-}
-
-// Initialize app when page loads
-document.addEventListener('DOMContentLoaded', () => {
-    // Show welcome modal only if it hasn't been shown before
-    if (!localStorage.getItem('welcomeShown')) {
-        document.getElementById('welcomeModal').style.display = 'flex';
-    } else {
-        document.getElementById('welcomeModal').style.display = 'none';
-    }
-
-    window.app = new IPCDehazeApp();
-});
+})();

@@ -1,231 +1,186 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPC-Dehaze - AI Image Dehazing Tool</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>IPC-Dehaze · Clear the haze</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
+<body data-csrf="{{ csrf }}" data-max-images="{{ max_images }}" data-max-mb="{{ max_upload_mb }}"
+      data-auth="{{ 'on' if auth_enabled else 'off' }}">
 
-<body>
-    <!-- Welcome Modal -->
-    <div class="modal-overlay" id="welcomeModal">
-        <div class="welcome-modal">
-            <div class="welcome-icon">
-                <i class="fas fa-cloud-sun"></i>
+<!-- Icon sprite (inline so the page needs no external files) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+        <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+        <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></symbol>
+        <symbol id="i-chip" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></symbol>
+        <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></symbol>
+        <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></symbol>
+    </defs>
+</svg>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="topbar">
+    <div class="topbar__inner">
+        <a class="brand" href="/" aria-label="IPC-Dehaze home">
+            <svg class="brand__mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg>
+            <span>IPC-Dehaze</span>
+        </a>
+        <div class="topbar__actions">
+            <span class="pill" id="enginePill" title="Processing engine status">
+                <svg class="icon"><use href="#i-chip"/></svg><span id="engineText">Checking…</span>
+            </span>
+            <button class="btn btn--ghost" id="historyBtn" type="button">
+                <svg class="icon"><use href="#i-clock"/></svg><span class="hide-sm">History</span>
+            </button>
+            {% if auth_enabled %}
+            <div class="user" id="userMenu">
+                <button class="user__btn" id="userBtn" type="button" aria-haspopup="true" aria-expanded="false">
+                    {% if user.picture %}
+                    <img class="avatar" src="{{ user.picture }}" alt="" referrerpolicy="no-referrer" width="32" height="32">
+                    {% else %}
+                    <span class="avatar avatar--letter">{{ (user.name or '?')[0] | upper }}</span>
+                    {% endif %}
+                    <span class="user__name hide-sm">{{ user.name }}</span>
+                </button>
+                <div class="user__menu" id="userDropdown" hidden>
+                    <div class="user__who"><strong>{{ user.name }}</strong><span>{{ user.email }}</span></div>
+                    <button class="user__item" id="logoutBtn" type="button">
+                        <svg class="icon"><use href="#i-logout"/></svg> Sign out
+                    </button>
+                </div>
             </div>
-            <div class="welcome-title">Welcome to IPC-Dehaze!</div>
-            <div class="welcome-message">
-                Your AI-powered solution for removing fog, haze, and atmospheric distortion from images.
+            {% endif %}
+        </div>
+    </div>
+</header>
+
+<main id="main" class="page">
+    {% if not auth_enabled %}
+    <div class="banner" role="note">
+        <svg class="icon"><use href="#i-alert"/></svg>
+        <span>Google sign-in is off, so anyone who can open this page can use it. Add your Google keys to turn it on
+            (see <code>docs/GOOGLE_LOGIN.md</code>).</span>
+    </div>
+    {% endif %}
+
+    <section class="hero">
+        <h1>Clear the haze from your photos</h1>
+        <p>Drop in foggy or hazy pictures. We remove the haze, then find licence plates and read them for you.</p>
+    </section>
+
+    <div class="grid-2" id="setup">
+        <section class="card" aria-labelledby="addTitle">
+            <div class="card__head">
+                <h2 id="addTitle"><span class="step">1</span> Add images</h2>
+                <button class="link-btn" id="clearBtn" type="button" hidden>Clear all</button>
             </div>
-            <div class="welcome-features">
-                <h4><i class="fas fa-star"></i> Key Features:</h4>
-                <ul class="feature-list">
-                    <li><i class="fas fa-check-circle"></i> Advanced AI dehazing technology</li>
-                    <li><i class="fas fa-check-circle"></i> Batch processing for multiple images</li>
-                    <li><i class="fas fa-check-circle"></i> Customizable processing parameters</li>
-                    <li><i class="fas fa-check-circle"></i> High-quality output results</li>
-                    <li><i class="fas fa-check-circle"></i> Easy drag & drop interface</li>
-                </ul>
+            <div class="dropzone" id="dropzone" tabindex="0" role="button"
+                 aria-label="Add images: drop files here or press Enter to browse">
+                <svg class="icon icon--xl"><use href="#i-upload"/></svg>
+                <p class="dropzone__title">Drop images here, or <span class="link">browse</span></p>
+                <p class="dropzone__hint">PNG, JPG, BMP, TIFF or WebP · up to {{ max_images }} images · {{ max_upload_mb }} MB total</p>
+                <input type="file" id="fileInput" accept="image/png,image/jpeg,image/bmp,image/tiff,image/webp" multiple hidden>
             </div>
-            <button class="modal-btn" onclick="closeWelcomeModal()">
-                <i class="fas fa-rocket"></i> Get Started
+            <ul class="thumbs" id="thumbs" aria-label="Selected images"></ul>
+        </section>
+
+        <section class="card" aria-labelledby="optTitle">
+            <div class="card__head"><h2 id="optTitle"><span class="step">2</span> Choose quality</h2></div>
+
+            <fieldset class="presets" id="presets">
+                <legend class="sr-only">Quality preset</legend>
+                <label class="preset"><input type="radio" name="preset" value="fast">
+                    <span><strong>Fast</strong><small>Quick preview</small></span></label>
+                <label class="preset"><input type="radio" name="preset" value="balanced" checked>
+                    <span><strong>Balanced</strong><small>Recommended</small></span></label>
+                <label class="preset"><input type="radio" name="preset" value="best">
+                    <span><strong>Best</strong><small>Slowest, most detail</small></span></label>
+            </fieldset>
+
+            <label class="switch">
+                <input type="checkbox" id="optPlates" checked>
+                <span class="switch__track" aria-hidden="true"></span>
+                <span class="switch__label"><strong>Find and read licence plates</strong>
+                    <small>Detects plates in the cleaned image and reads Indian plate numbers</small></span>
+            </label>
+
+            <details class="advanced">
+                <summary>Advanced options</summary>
+                <div class="fields">
+                    <label>Iterations <input type="number" id="optIter" min="1" max="20" value="8">
+                        <small>More = cleaner, slower</small></label>
+                    <label>Max size (px) <input type="number" id="optMax" min="512" max="3000" step="64" value="1500">
+                        <small>Bigger images are scaled down</small></label>
+                    <label>Upscale small images to <input type="number" id="optResize" min="0" max="3000" value="0">
+                        <small>0 = off</small></label>
+                    <label>Force width <input type="number" id="optFW" min="0" max="4000" value="0">
+                        <small>0 = automatic</small></label>
+                    <label>Force height <input type="number" id="optFH" min="0" max="4000" value="0">
+                        <small>0 = automatic</small></label>
+                    <label class="check"><input type="checkbox" id="optPost">
+                        <span>Extra contrast boost <small>can over-brighten some photos</small></span></label>
+                </div>
+            </details>
+
+            <button class="btn btn--primary btn--block" id="processBtn" type="button" disabled>
+                <span id="processLabel">Add images to start</span>
+            </button>
+            <p class="form-error" id="formError" role="alert" hidden></p>
+        </section>
+    </div>
+
+    <section id="resultsSection" class="results" aria-live="polite" hidden>
+        <div class="results__head">
+            <div>
+                <h2 id="resultsTitle">Processing…</h2>
+                <p class="muted" id="resultsSub"></p>
+            </div>
+            <div class="results__actions" id="resultsActions"></div>
+        </div>
+        <div class="progress" id="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="progress__bar" id="progressBar"></div>
+        </div>
+        <div class="summary" id="summary"></div>
+        <div class="cards" id="cards"></div>
+    </section>
+</main>
+
+<aside class="drawer" id="drawer" hidden aria-label="History">
+    <div class="drawer__panel">
+        <div class="drawer__head">
+            <h2>History</h2>
+            <button class="icon-btn" id="drawerClose" type="button" aria-label="Close history">
+                <svg class="icon"><use href="#i-x"/></svg>
             </button>
         </div>
+        <p class="muted drawer__note">Past batches are kept for {{ '%g' | format(ttl_hours) }} hours, then deleted.</p>
+        <ul class="history" id="historyList"></ul>
     </div>
+    <div class="drawer__scrim" id="drawerScrim"></div>
+</aside>
 
-    <div class="container">
-        <div class="header">
-            <h1><i class="fas fa-cloud-sun"></i> IPC-Dehaze</h1>
-            <p>AI-Powered Image Dehazing Tool - Remove Fog, Haze & Atmospheric Distortion</p>
-        </div>
+<div class="lightbox" id="lightbox" hidden>
+    <button class="icon-btn lightbox__close" id="lightboxClose" type="button" aria-label="Close preview">
+        <svg class="icon"><use href="#i-x"/></svg>
+    </button>
+    <img id="lightboxImg" alt="Full size preview">
+</div>
 
-        <div class="main-card">
-            <div class="card-header">
-                <h2><i class="fas fa-upload"></i> Upload Images</h2>
-                <p>Select multiple foggy images to process (Max: 10 images, 100MB total)</p>
-            </div>
-            <div class="card-body">
-                <div class="upload-area" id="uploadArea">
-                    <div class="upload-icon">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                    </div>
-                    <div class="upload-text">Drag & Drop images here or click to browse</div>
-                    <div class="upload-hint">Supports: PNG, JPG, JPEG, BMP, TIFF</div>
-                    <input type="file" class="file-input" id="fileInput" multiple accept="image/*">
-                </div>
+<div class="toasts" id="toasts" aria-live="assertive"></div>
 
-                <div class="uploaded-files" id="uploadedFiles" style="display: none;">
-                    <h3><i class="fas fa-images"></i> Uploaded Images</h3>
-                    <p style="color: #6b7280; margin-bottom: 15px; font-size: 0.9rem;">
-                        <i class="fas fa-magic"></i> License plates will be automatically detected and enhanced
-                    </p>
-                    <div class="file-grid" id="fileGrid"></div>
-                </div>
-
-                <div class="auto-detection-info" id="autoDetectionInfo" style="display: none;">
-                    <div class="info-card">
-                        <div class="info-icon">
-                            <i class="fas fa-robot"></i>
-                        </div>
-                        <div class="info-content">
-                            <h4><i class="fas fa-brain"></i> Automatic License Plate Detection</h4>
-                            <p>Our AI will automatically detect and enhance license plates including:</p>
-                            <ul class="detection-features">
-                                <li><i class="fas fa-star"></i> <strong>Yellow license plates</strong> (commercial
-                                    vehicles) - Primary focus</li>
-                                <li><i class="fas fa-star"></i> <strong>White license plates</strong> (private vehicles)
-                                    - High priority</li>
-                                <li><i class="fas fa-check-circle"></i> Blue license plates (government vehicles)</li>
-                                <li><i class="fas fa-check-circle"></i> Other colored plates using advanced detection
-                                </li>
-                            </ul>
-                            <div class="detection-status">
-                                <span class="status-text">Ready for automatic processing</span>
-                                <span class="status-icon">🤖</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="processing-options" id="processingOptions" style="display: none;">
-                    <h3><i class="fas fa-cogs"></i> Processing Options</h3>
-                    <div class="options-grid">
-                        <div class="option-group">
-                            <label class="option-label">Number of Iterations</label>
-                            <input type="number" class="option-input" id="numIterations" value="8" min="1" max="20">
-                            <div class="option-hint">Higher = better quality, slower processing</div>
-                        </div>
-                        <div class="option-group">
-                            <label class="option-label">Max Size (pixels)</label>
-                            <input type="number" class="option-input" id="maxSize" value="1500" min="512" max="3000">
-                            <div class="option-hint">Larger images will be scaled down</div>
-                        </div>
-                        <div class="option-group">
-                            <label class="option-label">Resize Long Edge To</label>
-                            <input type="number" class="option-input" id="resizeTo" value="0" min="0" max="3000">
-                            <div class="option-hint">0 = no resize, >0 = upscale small images</div>
-                        </div>
-                        <div class="option-group">
-                            <label class="option-label">Force Width (pixels)</label>
-                            <input type="number" class="option-input" id="forceWidth" value="0" min="0" max="3000">
-                            <div class="option-hint">0 = auto, >0 = force specific width</div>
-                        </div>
-                        <div class="option-group">
-                            <label class="option-label">Force Height (pixels)</label>
-                            <input type="number" class="option-input" id="forceHeight" value="0" min="0" max="3000">
-                            <div class="option-hint">0 = auto, >0 = force specific height</div>
-                        </div>
-                        <div class="option-group">
-                            <label class="option-label">
-                                <input type="checkbox" id="enhancePlates" class="option-checkbox" checked disabled>
-                                <span class="checkbox-label">Automatic License Plate Enhancement</span>
-                            </label>
-                            <div class="option-hint">Always enabled - AI automatically detects and enhances license
-                                plates</div>
-                        </div>
-                    </div>
-
-                    <div class="action-buttons">
-                        <button class="btn btn-primary" id="processBtn">
-                            <i class="fas fa-magic"></i> Process Images (Clear Fog + Detect Plates)
-                        </button>
-                        <button class="btn btn-secondary" id="clearBtn">
-                            <i class="fas fa-trash"></i> Clear All
-                        </button>
-                    </div>
-                </div>
-
-                <div class="loading" id="loading">
-                    <div class="spinner"></div>
-                    <h3>Processing Images...</h3>
-                    <p>This may take a few minutes depending on image size and settings</p>
-                    <div class="progress-bar" id="progressBar">
-                        <div class="progress-fill" id="progressFill"></div>
-                    </div>
-                </div>
-
-                <div class="alert" id="alert"></div>
-            </div>
-        </div>
-
-        <div class="main-card" id="resultsCard" style="display: none;">
-            <div class="card-header">
-                <h2><i class="fas fa-check-circle"></i> Processing Results</h2>
-                <p>Your dehazed images are ready for download</p>
-            </div>
-            <div class="card-body">
-                <div class="stats-bar" id="statsBar">
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <div class="stat-number" id="totalImages">0</div>
-                            <div class="stat-label">Total Images</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number" id="processedImages">0</div>
-                            <div class="stat-label">Processed</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number" id="totalSize">0</div>
-                            <div class="stat-label">Total Size (MB)</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="results-section">
-                    <h3><i class="fas fa-images"></i> Processing Results</h3>
-                    <div class="auto-results" id="autoResults">
-                        <div class="result-section">
-                            <h4><i class="fas fa-broom"></i> Clear Images (Fog Removed)</h4>
-                            <div id="dehazedResults">
-                                <p>Clear dehazed images will appear here</p>
-                            </div>
-                        </div>
-                        <div class="result-section">
-                            <h4><i class="fas fa-magic"></i> Enhanced License Plates</h4>
-                            <div id="processedResults">
-                                <p>Images with detected and enhanced license plates will appear here</p>
-                            </div>
-                        </div>
-                        <div class="result-section">
-                            <h4><i class="fas fa-search-plus"></i> Plate Crops (Zoomed)</h4>
-                            <div id="plateCrops">
-                                <p>Zoomed plate crops will appear here</p>
-                            </div>
-                        </div>
-                        <div class="detection-info-section">
-                            <h4><i class="fas fa-robot"></i> Detection Information</h4>
-                            <div id="detectionInfo">
-                                <p>License plate detection details will appear here</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="action-buttons">
-                    <button class="btn btn-primary" id="downloadAllBtn">
-                        <i class="fas fa-download"></i> Download All
-                    </button>
-                    <button class="btn btn-secondary" id="newSessionBtn">
-                        <i class="fas fa-plus"></i> New Session
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-
-    <!-- Fullscreen Image Modal -->
-    <div class="image-modal-overlay" id="imageModal" onclick="app.closeImageModal()">
-        <div class="image-modal-content">
-            <img id="imageModalImg" src="" alt="Preview">
-        </div>
-    </div>
-
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
-
 </html>

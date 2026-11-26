@@ -297,31 +297,37 @@ pip install easyocr
 
 ### Web Interface (Recommended for Beginners)
 
-1. **Start the Flask Server** (from the project root)
+1. **Start the server** (from the project root)
 
    ```bash
    python web/app.py
-   # optional: FLASK_DEBUG=1 PORT=8000 python web/app.py
+   # optional: PORT=8000 python web/app.py
    ```
 
 2. **Open Browser**
    Navigate to `http://localhost:5000`
 
-3. **Upload & Process**
-   - Upload up to 10 images (max 100MB total)
-   - Adjust processing parameters:
-     - **Iterations**: 1-20 (default: 8)
-     - **Max Size**: Maximum dimension (default: 1500)
-     - **Enhance Plates**: Enable/disable plate detection
-   - Click "Process" and download results
+3. **Add images, pick a quality, press the button**
+   - Drop, browse or paste up to 10 images (100 MB total)
+   - Choose **Fast**, **Balanced** (default) or **Best**. Measured on an RTX 3050 laptop GPU for a 1024×768 image
+     with plate reading: about 6 s, 11 s and 17 s. *Advanced options* has the raw numbers.
+   - Watch live progress, then compare before/after with the slider, copy plate numbers, and download the
+     images, a ZIP of everything, or a CSV of the plates
 
 **Web Interface Features:**
 
-- Real-time progress tracking
-- Image preview before/after
-- Batch download of results
-- Session-based processing
-- Automatic plate detection
+- **Sign in with Google** (optional, see [docs/GOOGLE_LOGIN.md](docs/GOOGLE_LOGIN.md)): new users get an account on
+  first sign-in, and each user only sees their own images
+- **Fast**: the models load once when the server starts (the old version reloaded them for every request), jobs
+  run in a queue with live progress, and half precision is used on the GPU
+- **History**: reopen earlier batches for 24 hours (`DATA_TTL_HOURS`), then they are deleted automatically
+- **Reliable**: uploads are checked (real image, size limit), one broken image never stops a batch, large images retry
+  at a smaller size if the GPU runs out of memory, and a `/health` page reports engine and GPU status
+- **Secure by default**: listens on this computer only, CSRF protection, strict content-security-policy, a random
+  secret key stored in `instance/`, and no external fonts or scripts
+- Dark mode follows your system; works on phones; fully keyboard accessible
+
+Without Google keys the page works exactly as before (open to anyone who can reach it) and shows a banner saying so.
 
 ### Command-Line Interface (CLI)
 
@@ -474,15 +480,19 @@ IPC-Dehazing-Project/
 ├── detect_plates.py          # CLI - Phase 2: plate detection on dehazed images
 ├── ipc_dehaze/               # Application code (our pipeline)
 │   ├── config.py             #   paths & defaults (model paths, iterations, max size)
-│   ├── dehaze.py             #   Dehazer: loads Predictor + Critic once, dehazes images
+│   ├── dehaze.py             #   Dehazer: loads Predictor + Critic once, dehazes images (fp16 on GPU)
+│   ├── engine.py             #   Engine: the one pipeline shared by the CLI and the web app
 │   ├── enhance.py            #   OpenCV post-processing (CLAHE, sharpen, binarize)
 │   └── plates/
 │       ├── detection.py      #   colour / edge / contour / YOLO plate detectors
 │       ├── ocr.py            #   EasyOCR + Indian plate format validation
 │       └── pipeline.py       #   detect -> enhance -> OCR -> validate
 ├── web/                      # Flask web interface
-│   ├── app.py
-│   ├── templates/index.html
+│   ├── app.py                #   routes, security headers, error handling
+│   ├── web_auth.py           #   Google sign-in, sessions, CSRF
+│   ├── web_jobs.py           #   upload validation, job queue, history, cleanup
+│   ├── web_settings.py       #   settings from environment / .env
+│   ├── templates/            #   index.html, login.html, error.html
 │   └── static/{css,js}/
 ├── basicsr/                  # Model architectures + training framework (from the paper)
 │   ├── archs/                #   DehazeTokenNet, Critic, VQGAN, SwinIR blocks, discriminator
@@ -504,7 +514,8 @@ IPC-Dehazing-Project/
 └── requirements.txt
 ```
 
-Runtime folders `uploads/`, `web_results/` and `results/` are created automatically and are git-ignored.
+Runtime folders `web_data/` (per-user uploads and results), `instance/` (secret key) and `results/` are created
+automatically and are git-ignored, as is your `.env` (copy `.env.example`).
 
 ---
 

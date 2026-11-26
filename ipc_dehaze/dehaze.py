@@ -31,8 +31,9 @@ def mirror_pad(img, multiple=PAD_MULTIPLE):
 class Dehazer:
     """Loads the networks once; ``dehaze`` then processes BGR uint8 images."""
 
-    def __init__(self, predictor_path=PREDICTOR_PATH, critic_path=CRITIC_PATH, device=None):
+    def __init__(self, predictor_path=PREDICTOR_PATH, critic_path=CRITIC_PATH, device=None, half=False):
         self.device = torch.device(device or ('cuda' if torch.cuda.is_available() else 'cpu'))
+        self.half = bool(half) and self.device.type == 'cuda'  # fp16 autocast, GPU only
 
         self.net_g = DehazeTokenNet(codebook_params=[64, 1024, 256], blk_depth=16, LQ_stage=True,
                                     predictor_name='swinLayer').to(self.device)
@@ -65,9 +66,12 @@ class Dehazer:
             img = _resize(img, scale=max_size / max(h, w))
         return img
 
-    @torch.no_grad()
     def dehaze_tensor(self, img, num_iterations=DEFAULT_NUM_ITERATIONS):
-        """Dehaze an NCHW tensor in [0, 1]; returns a tensor of the same size."""
+        """Dehaze an NCHW tensor in [0, 1]; returns a float32 tensor of the same size."""
+        with torch.no_grad(), torch.autocast(device_type='cuda', dtype=torch.float16, enabled=self.half):
+            return self._dehaze_tensor(img, num_iterations).float()
+
+    def _dehaze_tensor(self, img, num_iterations):
         _, _, h_old, w_old = img.shape
         img = mirror_pad(img)
 

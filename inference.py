@@ -15,8 +15,7 @@ import cv2
 from tqdm import tqdm
 
 from ipc_dehaze.config import CRITIC_PATH, DEFAULT_MAX_SIZE, DEFAULT_NUM_ITERATIONS, PREDICTOR_PATH
-from ipc_dehaze.dehaze import Dehazer, looks_blank
-from ipc_dehaze.enhance import enhance_output_quality
+from ipc_dehaze.engine import Engine
 
 PNG_LOSSLESS = [cv2.IMWRITE_PNG_COMPRESSION, 0]
 
@@ -44,15 +43,13 @@ def parse_args():
     return parser.parse_args()
 
 
-def run_plate_stage(image):
-    """Plate detection + OCR on a dehazed image; prints PLATE_JSON lines for the web app."""
-    from ipc_dehaze.plates import emit_plate_json, process_plates
+def report_plates(plates):
+    """Human-readable plate summary plus PLATE_JSON lines (for scripts that parse the output)."""
+    from ipc_dehaze.plates import emit_plate_json
 
     print("=" * 60)
     print("LICENSE PLATE DETECTION + OCR")
     print("=" * 60)
-    output, plates = process_plates(image)
-
     valid = [p for p in plates if p['valid']]
     if valid:
         print(f"\n✅ Successfully processed {len(valid)} valid license plate(s):")
@@ -62,7 +59,6 @@ def run_plate_stage(image):
     else:
         print("\n⚠️ No valid Indian license plates detected")
     print("=" * 60)
-    return output
 
 
 def main():
@@ -76,7 +72,7 @@ def main():
     resized_inputs_dir = os.path.join(args.output, 'resized_inputs')
     os.makedirs(resized_inputs_dir, exist_ok=True)
 
-    dehazer = Dehazer(args.predictor_path, args.critic_path)
+    engine = Engine(args.predictor_path, args.critic_path)
     force_size = (args.force_height, args.force_width) if args.force_width > 0 and args.force_height > 0 else None
     with_plates = args.enhance_plates and not args.dehaze_only
 
@@ -90,8 +86,8 @@ def main():
             continue
 
         try:
-            dehazed, processed_input = dehazer.dehaze(
-                image, args.n, args.max_size, args.resize_to, force_size)
+            result = engine.process(image, args.n, args.max_size, args.resize_to, force_size,
+                                    detect_plates=with_plates, post_enhance=args.post_enhance)
         except Exception as e:
             print(f"Error processing {imgname}: {e}")
             import traceback
@@ -100,20 +96,18 @@ def main():
 
         # Clean dehazed result (before any plate/colour enhancement)
         dehazed_path = os.path.join(args.output, f'{imgname}_dehazed.png')
-        cv2.imwrite(dehazed_path, dehazed, PNG_LOSSLESS)
+        cv2.imwrite(dehazed_path, result.dehazed, PNG_LOSSLESS)
         print(f"Saved dehazed image: {dehazed_path}")
-        cv2.imwrite(os.path.join(resized_inputs_dir, f'{imgname}.png'), processed_input)
+        cv2.imwrite(os.path.join(resized_inputs_dir, f'{imgname}.png'), result.processed_input, PNG_LOSSLESS)
 
         if args.dehaze_only:
             continue
 
-        final = run_plate_stage(dehazed) if with_plates else dehazed
-        if args.post_enhance:
-            final = enhance_output_quality(final)
-        if looks_blank(final):
+        if with_plates:
+            report_plates(result.plates)
+        if result.used_fallback:
             print(f"Warning: low-content output for {imgname}; falling back to the input image.")
-            final = cv2.resize(image, (final.shape[1], final.shape[0]))
-        cv2.imwrite(os.path.join(args.output, f'{imgname}.png'), final, PNG_LOSSLESS)
+        cv2.imwrite(os.path.join(args.output, f'{imgname}.png'), result.final, PNG_LOSSLESS)
 
 
 if __name__ == '__main__':
