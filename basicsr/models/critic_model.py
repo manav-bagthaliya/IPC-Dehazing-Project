@@ -18,7 +18,6 @@ from torch.utils.checkpoint import checkpoint
 import cv2
 from basicsr.utils.mask_schedule import schedule
 import math
-from ..utils.parallel_decode import gumbel_sample
 @MODEL_REGISTRY.register()
 class CriticModel(BaseModel):
     """Base UnderwaterNet model for single image super-resolution."""

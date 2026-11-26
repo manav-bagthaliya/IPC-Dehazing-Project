@@ -4,7 +4,6 @@ When GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set the app runs open as a 
 user and says so in the UI. When they are set, every page and API call needs a signed-in user.
 """
 
-import hashlib
 import hmac
 import logging
 import os
@@ -37,11 +36,6 @@ def current_user():
     if not settings().auth_enabled:
         return LOCAL_USER
     return session.get('user')
-
-
-def owner_dir_name(user):
-    """Filesystem-safe, stable folder name for a user (never contains user-controlled text)."""
-    return hashlib.sha256(user['id'].encode('utf-8')).hexdigest()[:16]
 
 
 def safe_next(target):

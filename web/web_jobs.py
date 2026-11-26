@@ -18,7 +18,6 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 
 import cv2
-import numpy as np
 from PIL import Image
 from werkzeug.utils import secure_filename
 

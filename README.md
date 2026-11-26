@@ -507,10 +507,10 @@ IPC-Dehazing-Project/
 │   ├── download_weights.py   #   fetch predictor.pth / critic.pth
 │   ├── check_env.py          #   environment check
 │   └── evaluate_iqa.py       #   PSNR / SSIM / NIQE / LPIPS ... via pyiqa
-├── pretrained_models/        # Weights (not in git) + yolov8n.pt
+├── pretrained_models/        # Weights (not in git): dehazing models + plate-detector YOLO11
 ├── tests/                    # pytest suite + tests/data sample images
 ├── examples/                 # Sample hazy inputs
-├── docs/                     # Paper figures and sample results
+├── docs/                     # GOOGLE_LOGIN.md (sign-in setup guide)
 └── requirements.txt
 ```
 
@@ -527,7 +527,7 @@ automatically and are git-ignored, as is your `.env` (copy `.env.example`).
 | -------------------- | -------------------------------------- |
 | **Language**         | Python 3.8+                            |
 | **Web Framework**    | Flask 2.3+                             |
-| **Deep Learning**    | PyTorch 1.12+, torchvision, torchaudio |
+| **Deep Learning**    | PyTorch 1.12+, torchvision |
 | **Computer Vision**  | OpenCV 4.8+, BasicSR                   |
 | **Model Components** | timm, einops                           |
 | **Object Detection** | Ultralytics YOLO 8.0+ (optional)       |

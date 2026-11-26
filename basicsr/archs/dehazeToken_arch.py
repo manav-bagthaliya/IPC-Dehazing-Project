@@ -1,26 +1,13 @@
 import torch
-import torch.nn.functional as F
 from torch import nn as nn
 import numpy as np
 from basicsr.utils.registry import ARCH_REGISTRY
-from torch import nn, Tensor
-from typing import Optional, List
+from torch import nn
 from .network_swinir import RSTB
 from .vqgan import VQGAN
 from .fema_utils import ResBlock
 from einops.layers.torch import Rearrange
 
-
-
-def _get_activation_fn(activation):
-    """Return an activation function given a string"""
-    if activation == "relu":
-        return F.relu
-    if activation == "gelu":
-        return F.gelu
-    if activation == "glu":
-        return F.glu
-    raise RuntimeError(f"activation should be relu/gelu, not {activation}.")
 
 class Predictor(nn.Module):
     def __init__(self, input_resolution=(32, 32), embed_dim=256, 
@@ -50,11 +37,6 @@ class Predictor(nn.Module):
         
         return logits
     
-class Swich(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-    def forward(self, x):
-        return x * torch.sigmoid(x)
 
 class Fuse_sft_block(nn.Module):
     def __init__(self, in_ch, out_ch):
@@ -81,42 +63,6 @@ class Fuse_sft_block(nn.Module):
         out = dec_feat + residual
         return out
     
-class TransformerSALayer(nn.Module):
-    def __init__(self, embed_dim, nhead=8, dim_mlp=2048, dropout=0.0, activation="gelu"):
-        super().__init__()
-        self.self_attn = nn.MultiheadAttention(embed_dim, nhead, dropout=dropout)
-        # Implementation of Feedforward model - MLP
-        self.linear1 = nn.Linear(embed_dim, dim_mlp)
-        self.dropout = nn.Dropout(dropout)
-        self.linear2 = nn.Linear(dim_mlp, embed_dim)
-
-        self.norm1 = nn.LayerNorm(embed_dim)
-        self.norm2 = nn.LayerNorm(embed_dim)
-        self.dropout1 = nn.Dropout(dropout)
-        self.dropout2 = nn.Dropout(dropout)
-
-        self.activation = _get_activation_fn(activation)
-
-    def with_pos_embed(self, tensor, pos: Optional[Tensor]):
-        return tensor if pos is None else tensor + pos
-
-    def forward(self, tgt,
-                tgt_mask: Optional[Tensor] = None,
-                tgt_key_padding_mask: Optional[Tensor] = None,
-                query_pos: Optional[Tensor] = None):
-
-        # self attention
-        tgt2 = self.norm1(tgt)
-        q = k = self.with_pos_embed(tgt2, query_pos)
-        tgt2 = self.self_attn(q, k, value=tgt2, attn_mask=tgt_mask,
-                              key_padding_mask=tgt_key_padding_mask)[0]
-        tgt = tgt + self.dropout1(tgt2)
-
-        # ffn
-        tgt2 = self.norm2(tgt)
-        tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt2))))
-        tgt = tgt + self.dropout2(tgt2)
-        return tgt
 
 
 @ARCH_REGISTRY.register()

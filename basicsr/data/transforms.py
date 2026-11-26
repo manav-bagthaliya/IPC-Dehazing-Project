@@ -3,25 +3,6 @@ import random
 import torch
 
 
-def mod_crop(img, scale):
-    """Mod crop images, used during testing.
-
-    Args:
-        img (ndarray): Input image.
-        scale (int): Scale factor.
-
-    Returns:
-        ndarray: Result image.
-    """
-    img = img.copy()
-    if img.ndim in (2, 3):
-        h, w = img.shape[0], img.shape[1]
-        h_remainder, w_remainder = h % scale, w % scale
-        img = img[:h - h_remainder, :w - w_remainder, ...]
-    else:
-        raise ValueError(f'Wrong img ndim: {img.ndim}.')
-    return img
-
 def random_crop(img_gts, gt_patch_size, gt_path=None):
     """Paired random crop. Support Numpy array and Tensor inputs.
 
@@ -74,80 +55,6 @@ def random_crop(img_gts, gt_patch_size, gt_path=None):
         img_lqs = img_lqs[0]
     return img_gts, img_lqs
 
-def paired_random_crop_t(img_gts, img_lqs, ts,gt_patch_size, scale, gt_path=None):
-    """Paired random crop. Support Numpy array and Tensor inputs.
-
-    It crops lists of lq and gt images with corresponding locations.
-
-    Args:
-        img_gts (list[ndarray] | ndarray | list[Tensor] | Tensor): GT images. Note that all images
-            should have the same shape. If the input is an ndarray, it will
-            be transformed to a list containing itself.
-        img_lqs (list[ndarray] | ndarray): LQ images. Note that all images
-            should have the same shape. If the input is an ndarray, it will
-            be transformed to a list containing itself.
-        gt_patch_size (int): GT patch size.
-        scale (int): Scale factor.
-        gt_path (str): Path to ground-truth. Default: None.
-
-    Returns:
-        list[ndarray] | ndarray: GT images and LQ images. If returned results
-            only have one element, just return ndarray.
-    """
-
-    if not isinstance(img_gts, list):
-        img_gts = [img_gts]
-        ts=[ts]
-    if not isinstance(img_lqs, list):
-        img_lqs = [img_lqs]
-
-    # determine input type: Numpy array or Tensor
-    input_type = 'Tensor' if torch.is_tensor(img_gts[0]) else 'Numpy'
-
-    if input_type == 'Tensor':
-        h_lq, w_lq = img_lqs[0].size()[-2:]
-        h_gt, w_gt = img_gts[0].size()[-2:]
-    else:
-        h_lq, w_lq = img_lqs[0].shape[0:2]
-        h_gt, w_gt = img_gts[0].shape[0:2]
-    lq_patch_size = gt_patch_size // scale
-
-    if h_gt != h_lq * scale or w_gt != w_lq * scale:
-        raise ValueError(f'Scale mismatches. GT ({h_gt}, {w_gt}) is not {scale}x ',
-                         f'multiplication of LQ ({h_lq}, {w_lq}).')
-    if h_lq < lq_patch_size or w_lq < lq_patch_size:
-        raise ValueError(f'LQ ({h_lq}, {w_lq}) is smaller than patch size '
-                         f'({lq_patch_size}, {lq_patch_size}). '
-                         f'Please remove {gt_path}.')
-
-    # randomly choose top and left coordinates for lq patch
-    top = random.randint(0, h_lq - lq_patch_size)
-    left = random.randint(0, w_lq - lq_patch_size)
-
-    # crop lq patch
-    if input_type == 'Tensor':
-        img_lqs = [v[:, :, top:top + lq_patch_size, left:left + lq_patch_size] for v in img_lqs]
-    else:
-        img_lqs = [v[top:top + lq_patch_size, left:left + lq_patch_size, ...] for v in img_lqs]
-
-    # crop corresponding gt patch
-    top_gt, left_gt = int(top * scale), int(left * scale)
-    if input_type == 'Tensor':
-        img_gts = [v[:, :, top_gt:top_gt + gt_patch_size, left_gt:left_gt + gt_patch_size] for v in img_gts]
-        ts=[v[:, :, top_gt:top_gt + gt_patch_size, left_gt:left_gt + gt_patch_size] for v in ts]
-     
-    else:
-        img_gts = [v[top_gt:top_gt + gt_patch_size, left_gt:left_gt + gt_patch_size, ...] for v in img_gts]
-        ts=[v[top_gt:top_gt + gt_patch_size, left_gt:left_gt + gt_patch_size, ...] for v in ts]
-       
-    if len(img_gts) == 1:
-        img_gts = img_gts[0]
-        ts=ts[0]
-       
-    if len(img_lqs) == 1:
-        img_lqs = img_lqs[0]
-
-    return img_gts, img_lqs,ts
 def paired_random_crop(img_gts, img_lqs, gt_patch_size, scale, gt_path=None):
     """Paired random crop. Support Numpy array and Tensor inputs.
 
@@ -283,23 +190,3 @@ def augment(imgs, hflip=True, rotation=True, flows=None, return_status=False):
         else:
             return imgs
 
-
-def img_rotate(img, angle, center=None, scale=1.0):
-    """Rotate image.
-
-    Args:
-        img (ndarray): Image to be rotated.
-        angle (float): Rotation angle in degrees. Positive values mean
-            counter-clockwise rotation.
-        center (tuple[int]): Rotation center. If the center is None,
-            initialize it as the center of the image. Default: None.
-        scale (float): Isotropic scale factor. Default: 1.0.
-    """
-    (h, w) = img.shape[:2]
-
-    if center is None:
-        center = (w // 2, h // 2)
-
-    matrix = cv2.getRotationMatrix2D(center, angle, scale)
-    rotated_img = cv2.warpAffine(img, matrix, (w, h))
-    return rotated_img

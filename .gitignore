@@ -119,8 +119,6 @@ dmypy.json
 .pyre/
 
 # Runtime outputs
-/uploads/
-/web_results/
 /results/
 /test_output/
 /test_results/
@@ -163,7 +161,6 @@ logs/
 /models/
 pretrained_models/*.pth
 pretrained_models/*.pt
-!pretrained_models/yolov8n.pt
 
 # Data directories (anchored so basicsr/data/ and tests/data/ are not ignored)
 /datasets/

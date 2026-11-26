@@ -24,8 +24,6 @@ TO_LETTER = {'0': 'O', '1': 'I', '2': 'Z', '5': 'S', '6': 'G', '8': 'B'}
 INDIAN_STATE_CODES = frozenset(
     'AN AP AR AS BR CG CH DD DL DN GA GJ HP HR JH JK KA KL LA LD MH ML MN MP MZ NL OD OR PB PY RJ SK TN TR TS UA UK '
     'UP WB'.split())
-LETTER_POSITIONS = (0, 1, 4, 5)
-DIGIT_POSITIONS = (2, 3, 6, 7, 8, 9)
 
 # Indian registration: state (2 letters), district (1-2 digits), series (1-3 letters), number (4 digits)
 PLATE_PATTERN = re.compile(r'^([A-Z]{2})(0[1-9]|[1-9]\d?)([A-Z]{1,3})(\d{4})$')  # district 01-99, never 0/00
@@ -96,25 +94,6 @@ def validate_indian_license_plate(text: str) -> dict:
     else:
         result['error'] = 'Invalid format'
     return result
-
-
-def coerce_to_pattern(s: str) -> str:
-    """Fix confusable characters of a 10-character string so it fits LL DD LL DDDD.
-
-    Text of any other length returns '' - padding or truncating would invent plate
-    characters that were never read.
-    """
-    s = _clean(s)
-    if len(s) != 10:
-        return ''
-    out = list(s)
-    for pos in LETTER_POSITIONS:
-        if not out[pos].isalpha():
-            out[pos] = TO_LETTER.get(out[pos], 'A')
-    for pos in DIGIT_POSITIONS:
-        if not out[pos].isdigit():
-            out[pos] = TO_DIGIT.get(out[pos], '0')
-    return ''.join(out)
 
 
 def _fit_layout(window: str, district_digits: int, series_letters: int):
@@ -214,32 +193,6 @@ def prepare_for_ocr(plate_bgr: np.ndarray, min_width: int = 320) -> np.ndarray:
         plate_bgr = cv2.resize(plate_bgr, (min_width, max(1, int(h * min_width / w))), interpolation=cv2.INTER_CUBIC)
     gray = cv2.cvtColor(plate_bgr, cv2.COLOR_BGR2GRAY)
     return cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4, 4)).apply(gray)
-
-
-def preprocess_for_ocr(plate_bgr: np.ndarray) -> np.ndarray:
-    """Crisp black-on-white version of a plate crop (kept for visualisation; not used for OCR)."""
-    gray = cv2.cvtColor(plate_bgr, cv2.COLOR_BGR2GRAY)
-
-    # Upscale small crops (target width ~480px)
-    h, w = gray.shape[:2]
-    target_w = 480
-    if w < target_w:
-        scale = target_w / max(1, w)
-        gray = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC)
-
-    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-    equalized = clahe.apply(gray)
-    blurred = cv2.GaussianBlur(equalized, (0, 0), 1.2)
-    sharp = cv2.addWeighted(equalized, 1.6, blurred, -0.6, 0)
-
-    bw = cv2.adaptiveThreshold(sharp, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 10)
-    if np.mean(bw) < 127:
-        bw = cv2.bitwise_not(bw)
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
-    bw = cv2.morphologyEx(bw, cv2.MORPH_OPEN, kernel, iterations=1)
-    bw = cv2.morphologyEx(bw, cv2.MORPH_CLOSE, kernel, iterations=1)
-    return bw
 
 
 def _get_reader():

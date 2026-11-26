@@ -21,54 +21,18 @@ from typing import Callable
 from einops import rearrange
 import torch
 import torch.nn.functional as F
-import math
 from basicsr.utils import mask_schedule
-import numpy as np
 
 def log(t, eps = 1e-10):
     return torch.log(t + eps)
 def exists(val):
     return val is not None
-def gumbel_noise(probs):
-    noise = torch.zeros_like(probs).uniform_(0, 1)
-    return -log(-log(noise))
 
-def gumbel_sample(probs, temperature = 1., dim = -1):
-    return ((probs / max(temperature, 1e-10)) + gumbel_noise(probs)).argmax(dim = dim)
 
 def uniform(shape, device):
     return torch.zeros(shape, device = device).float().uniform_(0, 1)
 
-def top_k(logits, thres = 0.5):
-    num_logits = logits.shape[-1]
-    k = max(int((1 - thres) * num_logits), 1)
-    val, ind = torch.topk(logits, k)
-    probs = torch.full_like(logits, float('-inf'))
-    probs.scatter_(1, ind, val)
-    return probs
 
-def sample_top_p(probs, p=0.75):
-    """
-    Perform top-p (nucleus) sampling on a probability distribution.
-
-    Args:
-        probs (torch.Tensor): Probability distribution tensor.
-        p (float): Probability threshold for top-p sampling.
-
-    Returns:
-        torch.Tensor: Sampled token indices.
-
-    Note:
-        Top-p sampling selects the smallest set of tokens whose cumulative probability mass
-        exceeds the threshold p. The distribution is renormalized based on the selected tokens.
-
-    """
-    probs_sort, probs_idx = torch.sort(probs, dim=-1, descending=True)
-    probs_sum = torch.cumsum(probs_sort, dim=-1)
-    mask = probs_sum - probs_sort > p
-    probs_sort[mask] = 0.0
-    probs_sort.div_(probs_sort.sum(dim=-1, keepdim=True))
-    return probs_sort
     # next_token = torch.multinomial(probs_sort, num_samples=1)
     # next_token = torch.gather(probs_idx, -1, next_token)
     # return next_token

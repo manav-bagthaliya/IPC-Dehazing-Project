@@ -1,7 +1,6 @@
 # Deep learning
 torch>=1.12.1
 torchvision
-torchaudio
 timm
 einops
 pyiqa                  # image-quality metrics + LPIPS loss used in training
@@ -17,7 +16,6 @@ tqdm
 # Training framework (basicsr/)
 pyyaml
 lmdb
-requests
 
 # Licence plate detection / OCR
 ultralytics>=8.0.0

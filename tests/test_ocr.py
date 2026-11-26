@@ -1,4 +1,4 @@
-from ipc_dehaze.plates.ocr import (best_plate_candidate, coerce_to_pattern, extract_plate_text, reading_order_text,
+from ipc_dehaze.plates.ocr import (best_plate_candidate, extract_plate_text, reading_order_text,
                                    validate_indian_license_plate)
 
 
@@ -64,14 +64,9 @@ def test_empty_text():
     assert validate_indian_license_plate('')['error'] == 'Empty text'
 
 
-def test_coerce_fixes_common_confusions():
-    # O->0 in digit slots, 8->B in letter slots
-    assert coerce_to_pattern('MHO1A81234') == 'MH01AB1234'
-
-
 def test_short_text_is_never_padded_into_a_plate():
-    assert coerce_to_pattern('DO60CZ') == ''
-    assert coerce_to_pattern('MH01AB12345') == ''  # no truncation either
+    assert extract_plate_text('DO60CZ') == ''
+    assert extract_plate_text('MH01AB12345') == 'MH 01 AB 1234'  # trailing noise is ignored, nothing is invented
     assert best_plate_candidate('DO60CZ') == 'DO60CZ'  # raw text kept, but not "valid"
     assert not validate_indian_license_plate(best_plate_candidate('DO60CZ'))['is_valid']
 

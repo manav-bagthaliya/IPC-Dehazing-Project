@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 from torch.utils.checkpoint import checkpoint
 from basicsr.utils.mask_schedule import schedule
 import math
-from ..utils.parallel_decode import gumbel_sample
 import copy
 import pyiqa
 @MODEL_REGISTRY.register()

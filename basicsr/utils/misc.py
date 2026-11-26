@@ -124,18 +124,3 @@ def check_resume(opt, resume_iter):
                 print(f'Set {param_key} to params')
 
 
-def sizeof_fmt(size, suffix='B'):
-    """Get human readable file size.
-
-    Args:
-        size (int): File size.
-        suffix (str): Suffix. Default: 'B'.
-
-    Return:
-        str: Formatted file siz.
-    """
-    for unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
-        if abs(size) < 1024.0:
-            return f'{size:3.1f} {unit}{suffix}'
-        size /= 1024.0
-    return f'{size:3.1f} Y{suffix}'

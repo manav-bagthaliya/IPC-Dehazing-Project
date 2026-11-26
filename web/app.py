@@ -22,7 +22,7 @@ for path in (ROOT_DIR, WEB_DIR):
     if path not in sys.path:
         sys.path.insert(0, path)
 
-from web_auth import check_csrf, csrf_token, current_user, init_auth, login_required, settings as _settings  # noqa: E402
+from web_auth import check_csrf, csrf_token, current_user, init_auth, login_required  # noqa: E402
 from web_jobs import JobError, JobManager  # noqa: E402
 from web_settings import load_settings  # noqa: E402
 
