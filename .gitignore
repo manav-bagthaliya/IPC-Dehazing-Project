@@ -177,3 +177,7 @@ config.ini
 secrets.json
 .secrets
 
+
+# local benchmark datasets and reports
+/benchmarks/plates_test/
+/benchmarks/*.json

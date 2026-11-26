@@ -9,7 +9,7 @@ import os
 import cv2
 import numpy as np
 
-from ipc_dehaze.config import MAX_PLATES, YOLO_PATH
+from ipc_dehaze.config import MAX_PLATES, YOLO_CONF, YOLO_PATH
 
 try:
     from ultralytics import YOLO
@@ -20,6 +20,7 @@ except ImportError:
 
 # Loaded once on first use
 _yolo_model = None
+_yolo_model_path = None
 
 _KERNEL_3x3 = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
 _KERNEL_5x3 = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 3))
@@ -153,31 +154,35 @@ def detect_plates_by_edges(image):
     return plates
 
 
-def detect_license_plates_yolo(image, model_path=YOLO_PATH):
-    """YOLO detections with confidence > 0.5.
+def yolo_model_available(model_path=YOLO_PATH):
+    """True if ultralytics is installed and the plate-trained weights file exists."""
+    return YOLO_AVAILABLE and os.path.exists(model_path)
 
-    NOTE: the default ``yolov8n.pt`` is the stock COCO model, so it returns any object
-    (cars, people, ...), not just plates. Point ``model_path`` at a plate-trained model.
-    """
-    global _yolo_model
+
+def detect_license_plates_yolo(image, model_path=YOLO_PATH, conf=YOLO_CONF):
+    """Plate boxes from the plate-trained YOLO model (single class: licence plate)."""
+    global _yolo_model, _yolo_model_path
     if not YOLO_AVAILABLE:
         return []
     try:
-        if _yolo_model is None:
+        if _yolo_model is None or _yolo_model_path != model_path:
             if not os.path.exists(model_path):
-                print(f"YOLO model not found at {model_path}")
+                print(f"YOLO plate model not found at {model_path}")
                 return []
             _yolo_model = YOLO(model_path)
+            _yolo_model_path = model_path
 
+        h, w = image.shape[:2]
         plates = []
-        for result in _yolo_model(image, verbose=False):
+        for result in _yolo_model(image, conf=conf, verbose=False):
             if getattr(result, 'boxes', None) is None:
                 continue
             for box in result.boxes:
-                if box.conf > 0.5:
-                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                x1, y1, x2, y2 = max(0, int(x1)), max(0, int(y1)), min(w, int(x2)), min(h, int(y2))
+                if x2 > x1 and y2 > y1:
                     plates.append({
-                        'bbox': [int(x1), int(y1), int(x2), int(y2)],
+                        'bbox': [x1, y1, x2, y2],
                         'confidence': float(box.conf[0]),
                         'method': 'yolo',
                         'color': 'unknown'
@@ -213,9 +218,28 @@ def remove_duplicate_detections(plates, max_plates=MAX_PLATES, overlap_threshold
     return unique[:max_plates]
 
 
-def detect_license_plates_advanced(image):
-    """Run every detector, merge the results, and retry once on a contrast-boosted image."""
+def detect_license_plates_advanced(image, use_heuristics=True):
+    """Find plates: the plate-trained YOLO model first, colour/edge heuristics as fallback.
+
+    The heuristic detectors fire on any bright or plate-shaped blob, so when the plate
+    model finds something its result is used alone (much higher precision). The heuristics
+    only run if the model is unavailable or finds nothing (``use_heuristics=False``
+    disables that fallback).
+    """
     print(f"Starting license plate detection on image shape: {image.shape}")
+
+    if yolo_model_available():
+        yolo_plates = detect_license_plates_yolo(image)
+        print(f"YOLO plates found: {len(yolo_plates)}")
+        if yolo_plates:
+            return remove_duplicate_detections(yolo_plates)
+        if not use_heuristics:
+            return []
+        print("YOLO found no plates; falling back to colour/edge heuristics")
+    elif not use_heuristics:
+        return []
+    else:
+        print("YOLO plate model unavailable; using colour/edge heuristics only")
 
     detectors = [
         ('Yellow', detect_yellow_license_plates),
@@ -225,8 +249,6 @@ def detect_license_plates_advanced(image):
         ('OpenCV', detect_license_plates_opencv),
         ('Edge-based', detect_plates_by_edges),
     ]
-    if YOLO_AVAILABLE:
-        detectors.append(('YOLO', detect_license_plates_yolo))
 
     plates = []
     for name, detector in detectors:

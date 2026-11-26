@@ -28,7 +28,7 @@ def enhance_output_quality(image):
         return image
 
 
-def _crop(image, bbox):
+def crop_region(image, bbox):
     """Crop ``bbox`` (x1, y1, x2, y2) clamped to the image; returns None if empty."""
     x1, y1, x2, y2 = bbox
     x1, y1 = max(0, x1), max(0, y1)
@@ -47,7 +47,7 @@ def _resize_to_width(region, width=400):
 
 def enhance_plate_region(image, plate_bbox):
     """Colour-preserving contrast/sharpness boost of a plate crop. Returns the enhanced crop."""
-    region = _crop(image, plate_bbox)
+    region = crop_region(image, plate_bbox)
     if region is None:
         return image
     region = _resize_to_width(region)
@@ -97,7 +97,7 @@ def binarize_plate(region):
 
 def binarize_plate_region(image, plate_bbox):
     """``binarize_plate`` applied to ``plate_bbox`` of ``image``. Returns the enhanced crop."""
-    region = _crop(image, plate_bbox)
+    region = crop_region(image, plate_bbox)
     if region is None:
         return image
     return binarize_plate(region)

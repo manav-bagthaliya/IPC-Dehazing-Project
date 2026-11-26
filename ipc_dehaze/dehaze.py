@@ -9,6 +9,10 @@ from basicsr.utils import img2tensor, parallel_decode, tensor2img
 from ipc_dehaze.config import CRITIC_PATH, DEFAULT_MAX_SIZE, DEFAULT_NUM_ITERATIONS, PAD_MULTIPLE, PREDICTOR_PATH
 
 
+# Fractions of max_size to try, in order, when the GPU runs out of memory
+OOM_SHRINK_STEPS = (1.0, 0.75, 0.55, 0.4)
+
+
 def _resize(img, size=None, scale=None):
     """Bilinear resize of an NCHW tensor (same as nn.UpsamplingBilinear2d)."""
     return F.interpolate(img, size=size, scale_factor=scale, mode='bilinear', align_corners=True)
@@ -98,6 +102,23 @@ class Dehazer:
 
     def dehaze(self, image_bgr, num_iterations=DEFAULT_NUM_ITERATIONS, max_size=DEFAULT_MAX_SIZE,
                resize_to=0, force_size=None):
+        """Dehaze a BGR uint8 image (see ``_dehaze_once`` for the arguments and return value).
+
+        If the GPU runs out of memory the image is retried at a smaller processing size
+        (the output is still resized back to the original dimensions), so a large upload
+        degrades gracefully on small GPUs instead of failing.
+        """
+        for attempt, shrink in enumerate(OOM_SHRINK_STEPS):
+            try:
+                return self._dehaze_once(image_bgr, num_iterations, int(max_size * shrink), resize_to, force_size)
+            except torch.cuda.OutOfMemoryError:
+                torch.cuda.empty_cache()
+                if force_size or attempt == len(OOM_SHRINK_STEPS) - 1:
+                    raise
+                print(f'GPU out of memory at max_size={int(max_size * shrink)}; retrying smaller')
+
+    def _dehaze_once(self, image_bgr, num_iterations=DEFAULT_NUM_ITERATIONS, max_size=DEFAULT_MAX_SIZE,
+                     resize_to=0, force_size=None):
         """Dehaze a BGR uint8 image.
 
         Output size: ``force_size`` (h, w) if given; the upscaled size if ``resize_to``

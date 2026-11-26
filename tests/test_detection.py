@@ -1,7 +1,8 @@
 import pytest
 
+from ipc_dehaze.plates import detection
 from ipc_dehaze.plates.detection import (bbox_overlap, detect_license_plates_advanced, detect_yellow_license_plates,
-                                         remove_duplicate_detections)
+                                         remove_duplicate_detections, yolo_model_available)
 
 
 def test_bbox_overlap():
@@ -28,6 +29,22 @@ def test_remove_duplicates_caps_count():
 def test_yellow_plate_found(yellow_plate_image):
     plates = detect_yellow_license_plates(yellow_plate_image)
     assert any(bbox_overlap(p['bbox'], (200, 200, 501, 251)) > 0.9 for p in plates)
+
+
+@pytest.mark.skipif(not yolo_model_available(), reason='plate-trained YOLO weights not available')
+def test_yolo_is_authoritative_when_it_finds_plates(monkeypatch, yellow_plate_image):
+    fake = [{'bbox': [10, 10, 110, 40], 'confidence': 0.9, 'method': 'yolo', 'color': 'unknown'}]
+    monkeypatch.setattr(detection, 'detect_license_plates_yolo', lambda image: fake)
+    monkeypatch.setattr(detection, 'detect_yellow_license_plates',
+                        lambda image: pytest.fail('heuristics must not run when YOLO found a plate'))
+    assert detect_license_plates_advanced(yellow_plate_image) == fake
+
+
+def test_heuristics_used_when_yolo_unavailable(monkeypatch, yellow_plate_image):
+    monkeypatch.setattr(detection, 'yolo_model_available', lambda *a, **k: False)
+    plates = detect_license_plates_advanced(yellow_plate_image)
+    assert any(bbox_overlap(p['bbox'], (200, 200, 501, 251)) > 0.5 for p in plates)
+    assert detect_license_plates_advanced(yellow_plate_image, use_heuristics=False) == []
 
 
 @pytest.mark.parametrize('name', ['yellow_plate_test.jpg', 'white_plate_test.jpg', 'blue_plate_test.jpg',

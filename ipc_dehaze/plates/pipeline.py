@@ -4,7 +4,7 @@ import json
 
 import cv2
 
-from ipc_dehaze.enhance import enhance_plate_region
+from ipc_dehaze.enhance import crop_region, enhance_plate_region
 from ipc_dehaze.plates.detection import detect_license_plates_advanced
 from ipc_dehaze.plates.ocr import recognize_plate_text, validate_indian_license_plate
 
@@ -41,7 +41,9 @@ def process_plates(image, enhancer=enhance_plate_region, only_valid=True):
               f"({plate.get('method', 'unknown')}) - Confidence: {plate['confidence']:.2f}")
 
         enhanced = enhancer(image, plate['bbox'])
-        text = recognize_plate_text(enhanced)
+        # OCR reads the plain crop: the enhanced/binarised version is for display and hurts recognition
+        raw_crop = crop_region(image, plate['bbox'])
+        text = recognize_plate_text(raw_crop) if raw_crop is not None else ''
         validation = validate_indian_license_plate(text)
         plate.update({
             'text': text,

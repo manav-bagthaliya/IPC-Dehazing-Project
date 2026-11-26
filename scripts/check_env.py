@@ -11,6 +11,10 @@ import sys
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
 
+# Windows consoles default to cp1252 and cannot print the check marks below
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 from ipc_dehaze.config import CRITIC_PATH, PREDICTOR_PATH, YOLO_PATH  # noqa: E402
 
 REQUIRED = ['torch', 'torchvision', 'cv2', 'numpy', 'timm', 'einops', 'pyiqa', 'flask', 'tqdm', 'yaml']

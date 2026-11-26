@@ -189,6 +189,7 @@ def process_images():
             encoding='utf-8',
             errors='replace',  # Handle Unicode errors gracefully
             cwd=ROOT_DIR,
+            env={**os.environ, 'PYTHONIOENCODING': 'utf-8'},  # child prints non-cp1252 symbols on Windows
             timeout=900  # 15 minute timeout for slower CPUs/large images
         )
 

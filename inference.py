@@ -9,6 +9,7 @@ Examples:
 import argparse
 import glob
 import os
+import sys
 
 import cv2
 from tqdm import tqdm
@@ -37,6 +38,9 @@ def parse_args():
                         help='with --force_width, resize ALL inputs to this height')
     parser.add_argument('--enhance_plates', action='store_true', help='detect, enhance and OCR licence plates')
     parser.add_argument('--dehaze_only', action='store_true', help='only dehaze; skip plate detection')
+    parser.add_argument('--post_enhance', action='store_true',
+                        help='apply extra global CLAHE/gamma/sharpen on the result (off by default: it '
+                             'over-brightens and clips highlights on most images)')
     return parser.parse_args()
 
 
@@ -62,6 +66,11 @@ def run_plate_stage(image):
 
 
 def main():
+    # Windows consoles/pipes default to cp1252, which cannot print the status symbols used below
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
+
     args = parse_args()
     os.makedirs(args.output, exist_ok=True)
     resized_inputs_dir = os.path.join(args.output, 'resized_inputs')
@@ -99,7 +108,8 @@ def main():
             continue
 
         final = run_plate_stage(dehazed) if with_plates else dehazed
-        final = enhance_output_quality(final)
+        if args.post_enhance:
+            final = enhance_output_quality(final)
         if looks_blank(final):
             print(f"Warning: low-content output for {imgname}; falling back to the input image.")
             final = cv2.resize(image, (final.shape[1], final.shape[0]))

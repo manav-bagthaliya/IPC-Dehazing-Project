@@ -352,8 +352,7 @@ python inference.py \
   -n 10 \
   --max_size 2000 \
   --resize_to 1024 \
-  --enhance_plates \
-  --save_plate_crops
+  --enhance_plates
 ```
 
 **CLI Parameters:**
@@ -366,7 +365,7 @@ python inference.py \
 - `--force_width`, `--force_height`: Force specific dimensions
 - `--enhance_plates`: Enable automatic license plate detection
 - `--dehaze_only`: Skip plate detection
-- `--save_plate_crops`: Save individual plate crops
+- `--post_enhance`: Apply extra global CLAHE/gamma/sharpening to the final image (off by default; it over-brightens and clips highlights on most images)
 
 ### Two-Phase Workflow
 
@@ -414,6 +413,58 @@ python inference.py -i input/ -o output/ -n 15 --enhance_plates
 python inference.py -i large_batch/ -o results/ --max_size 1200 --dehaze_only
 python detect_plates.py -i results/ -o final/
 ```
+
+## 📊 Accuracy Benchmark
+
+`scripts/benchmark_plates.py` measures plate detection, OCR and dehazing quality on labelled images.
+
+```bash
+# Detection on clear images (COCO annotations; YOLO txt labels also supported via --labels)
+python scripts/benchmark_plates.py --images benchmarks/plates_test \
+    --coco benchmarks/plates_test/_annotations.coco.json --limit 150 --detector yolo
+
+# Effect of haze and of dehazing (synthetic haze; add --texts plates.csv for OCR accuracy)
+python scripts/benchmark_plates.py --images benchmarks/plates_test \
+    --coco benchmarks/plates_test/_annotations.coco.json --limit 20 \
+    --conditions clear,hazy,dehazed --detector yolo --out benchmarks/haze_report.json
+```
+
+- **Detection**: precision, recall, F1, AP50 and mean IoU (IoU threshold `--iou`, default 0.5).
+- **OCR** (needs `--texts` CSV with header `filename,text`): exact-match and character accuracy, measured both
+  on the ground-truth box (OCR alone) and on the detected box (full pipeline).
+- **Restoration**: PSNR / SSIM of the hazy and dehazed images against the clear originals.
+- `--detector yolo|full|heuristics` compares the plate model, the pipeline default and the old colour/edge baseline.
+
+Measured on 150 images of the public CC-BY `keremberke/license-plate-object-detection` test split (156 plates, clear
+images, IoU 0.5):
+
+| Detector | Precision | Recall | F1 | AP50 |
+|---|---|---|---|---|
+| Old colour/edge heuristics | 0.111 | 0.462 | 0.179 | 0.062 |
+| Plate-trained YOLO11-m (default) | 0.981 | 0.981 | 0.981 | 0.981 |
+
+The plate model's own training data is not fully documented, so the figures above can be optimistic. Measure on your own
+hazy photos before trusting them for a real deployment.
+
+### OCR accuracy
+
+`scripts/benchmark_ocr.py` scores plate reading on cropped plate images with a `filename,text` CSV:
+
+```bash
+python scripts/benchmark_ocr.py --images benchmarks/plates_ocr/images --texts benchmarks/plates_ocr/plates.csv
+```
+
+Measured on 100 Indian plate crops (public MIT-licensed set `AnirudhLanka2002/TR_OCR_Training_License_Plate`; some of
+its labels are truncated, which caps the achievable score):
+
+| | Exact match | Character accuracy | Reads that are valid *and* correct |
+|---|---|---|---|
+| Before (binarised crop, confidence-ordered text, zero-padding) | 11% | 0.50 | - |
+| Now (plain CLAHE crop, reading-order text, "IND"-aware decoder) | **56%** | **0.84** | 80% of reads reported valid |
+
+The decoder only repairs up to 2 confusable characters (O/0, I/1, ...) and never pads or truncates, so a misread
+plate is reported as unreadable instead of being invented. The tuning data and test data are the same 100 crops, so treat
+the numbers as an upper estimate and re-measure on your own photos.
 
 ## 📁 Project Structure
 
@@ -553,11 +604,11 @@ The system employs **5 complementary detection methods** for maximum recall:
 - Morphological transformations
 - Aspect ratio and area validation
 
-#### 6. **YOLO Detection** (Optional)
+#### 6. **YOLO Plate Detection** (primary detector)
 
-- YOLOv8 nano model
-- Real-time object detection
-- High accuracy for visible plates
+- Plate-trained YOLO11 model (`pretrained_models/license_plate_yolo11m.pt`)
+- Runs first; when it finds plates its result is used alone (the colour/edge methods above are noisy)
+- The colour/edge methods above are only a fallback when the model is missing or finds nothing
 - Requires: `pip install ultralytics`
 
 ### OCR & Validation

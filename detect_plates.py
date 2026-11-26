@@ -8,6 +8,7 @@ Example:
 import argparse
 import glob
 import os
+import sys
 
 import cv2
 from tqdm import tqdm
@@ -20,6 +21,11 @@ CROP_WIDTH = 900
 
 
 def main():
+    # Windows consoles/pipes default to cp1252, which cannot print the status symbols in the pipeline
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
+
     parser = argparse.ArgumentParser(description='Phase 2: License Plate Detection on Dehazed Images')
     parser.add_argument('-i', '--input', type=str, required=True,
                         help='a dehazed image, or a folder of *_dehazed.png files')

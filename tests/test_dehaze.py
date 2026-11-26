@@ -20,6 +20,32 @@ def test_looks_blank():
     assert not looks_blank(np.random.randint(0, 255, (10, 10, 3), np.uint8))
 
 
+def test_dehaze_retries_smaller_on_cuda_oom(monkeypatch):
+    from ipc_dehaze.dehaze import Dehazer
+    sizes = []
+
+    def fake_once(self, image, n, max_size, resize_to, force_size):
+        sizes.append(max_size)
+        if len(sizes) < 3:
+            raise torch.cuda.OutOfMemoryError('simulated')
+        return 'ok'
+
+    monkeypatch.setattr(Dehazer, '_dehaze_once', fake_once)
+    assert Dehazer.__new__(Dehazer).dehaze(None, 8, 1000) == 'ok'
+    assert sizes == [1000, 750, 550]
+
+
+def test_dehaze_oom_with_forced_size_is_not_retried(monkeypatch):
+    from ipc_dehaze.dehaze import Dehazer
+
+    def always_oom(self, *args):
+        raise torch.cuda.OutOfMemoryError('simulated')
+
+    monkeypatch.setattr(Dehazer, '_dehaze_once', always_oom)
+    with pytest.raises(torch.cuda.OutOfMemoryError):
+        Dehazer.__new__(Dehazer).dehaze(None, 8, 1000, 0, (480, 640))
+
+
 @pytest.mark.skipif(not (os.path.exists(PREDICTOR_PATH) and os.path.exists(CRITIC_PATH)),
                     reason='pretrained weights not downloaded')
 def test_dehaze_end_to_end(data_image):
